@@ -26,24 +26,55 @@ function drawRoundedRect(context, x, y, width, height, radius) {
   context.closePath();
 }
 
+function splitWordToFit(context, word, maxWidth) {
+  if (context.measureText(word).width <= maxWidth) {
+    return [word];
+  }
+
+  const segments = [];
+  let current = "";
+
+  for (const character of word) {
+    const trial = `${current}${character}`;
+
+    if (current && context.measureText(trial).width > maxWidth) {
+      segments.push(current);
+      current = character;
+      continue;
+    }
+
+    current = trial;
+  }
+
+  if (current) {
+    segments.push(current);
+  }
+
+  return segments;
+}
+
 function wrapText(context, text, maxWidth) {
   const words = text.split(/\s+/).filter(Boolean);
   const lines = [];
   let currentLine = "";
 
   for (const word of words) {
-    const trialLine = currentLine ? `${currentLine} ${word}` : word;
+    const segments = splitWordToFit(context, word, maxWidth);
 
-    if (context.measureText(trialLine).width <= maxWidth) {
-      currentLine = trialLine;
-      continue;
+    for (const segment of segments) {
+      const trialLine = currentLine ? `${currentLine} ${segment}` : segment;
+
+      if (context.measureText(trialLine).width <= maxWidth) {
+        currentLine = trialLine;
+        continue;
+      }
+
+      if (currentLine) {
+        lines.push(currentLine);
+      }
+
+      currentLine = segment;
     }
-
-    if (currentLine) {
-      lines.push(currentLine);
-    }
-
-    currentLine = word;
   }
 
   if (currentLine) {
@@ -64,6 +95,58 @@ function fitQuoteLines(context, text, maxWidth, maxLines) {
   const limited = lines.slice(0, maxLines);
   limited[maxLines - 1] = `${limited[maxLines - 1].replace(/[.,;:!?-]*$/, "")}...`;
   return limited;
+}
+
+function decorateQuoteLines(lines) {
+  return lines.map((line, index) => {
+    if (lines.length === 1) {
+      return `" ${line} "`;
+    }
+
+    if (index === 0) {
+      return `" ${line}`;
+    }
+
+    if (index === lines.length - 1) {
+      return `${line} "`;
+    }
+
+    return line;
+  });
+}
+
+function findQuoteLayout(context, quoteText, maxWidth, options = {}) {
+  const normalized = quoteText.replace(/\s+/g, " ").trim();
+  const maxLines = options.maxLines || 5;
+  const maxHeight = options.maxHeight || 116;
+  const maxFontSize = options.maxFontSize || 26;
+  const minFontSize = options.minFontSize || 18;
+
+  for (let fontSize = maxFontSize; fontSize >= minFontSize; fontSize -= 1) {
+    context.font = `bold ${fontSize}px "${getFontFamily("bold")}"`;
+
+    const lines = wrapText(context, normalized, maxWidth);
+    const renderedLines = decorateQuoteLines(lines);
+    const lineHeight = Math.round(fontSize * 1.2);
+    const blockHeight = renderedLines.length * lineHeight;
+    const widestLine = Math.max(...renderedLines.map((line) => context.measureText(line).width));
+
+    if (renderedLines.length <= maxLines && blockHeight <= maxHeight && widestLine <= maxWidth) {
+      return {
+        fontSize,
+        lineHeight,
+        renderedLines
+      };
+    }
+  }
+
+  context.font = `bold ${minFontSize}px "${getFontFamily("bold")}"`;
+
+  return {
+    fontSize: minFontSize,
+    lineHeight: Math.round(minFontSize * 1.2),
+    renderedLines: decorateQuoteLines(fitQuoteLines(context, normalized, maxWidth, maxLines))
+  };
 }
 
 async function loadAvatarImage(user) {
@@ -175,55 +258,47 @@ function drawQuoteText(context, quoteText, displayName, username) {
   const panelX = 230;
   const panelWidth = 318;
   const centerX = panelX + (panelWidth / 2);
-  const quoteWidth = 250;
+  const quoteWidth = 246;
+  const quoteAreaTop = 74;
+  const quoteAreaHeight = 112;
+  const quoteLayout = findQuoteLayout(context, quoteText, quoteWidth, {
+    maxLines: 5,
+    maxHeight: quoteAreaHeight,
+    maxFontSize: 26,
+    minFontSize: 18
+  });
+  const quoteBlockHeight = quoteLayout.renderedLines.length * quoteLayout.lineHeight;
+  const quoteStartY = quoteAreaTop + ((quoteAreaHeight - quoteBlockHeight) / 2) + (quoteLayout.lineHeight / 2);
+  const quoteEndY = quoteStartY + ((quoteLayout.renderedLines.length - 1) * quoteLayout.lineHeight) + (quoteLayout.lineHeight / 2);
 
   context.fillStyle = "#f3f1ec";
-  context.font = `bold 26px "${getFontFamily("bold")}"`;
-  const lines = fitQuoteLines(context, quoteText, quoteWidth, 4);
-  const lineHeight = 31;
-  const quoteBlockHeight = lines.length * lineHeight;
-  const quoteStartY = lines.length <= 2 ? 116 : 92;
-  const quoteEndY = quoteStartY + quoteBlockHeight;
+  context.font = `bold ${quoteLayout.fontSize}px "${getFontFamily("bold")}"`;
 
   context.textAlign = "center";
+  context.textBaseline = "middle";
   context.shadowColor = "rgba(255, 255, 255, 0.08)";
   context.shadowBlur = 10;
 
-  const renderedLines = lines.map((line, index) => {
-    if (lines.length === 1) {
-      return `" ${line} "`;
-    }
-
-    if (index === 0) {
-      return `" ${line}`;
-    }
-
-    if (index === lines.length - 1) {
-      return `${line} "`;
-    }
-
-    return line;
-  });
-
-  renderedLines.forEach((line, index) => {
-    context.fillText(line, centerX, quoteStartY + (index * lineHeight));
+  quoteLayout.renderedLines.forEach((line, index) => {
+    context.fillText(line, centerX, quoteStartY + (index * quoteLayout.lineHeight));
   });
   context.shadowBlur = 0;
+  context.textBaseline = "alphabetic";
 
   context.strokeStyle = "rgba(255, 255, 255, 0.08)";
   context.lineWidth = 1;
   context.beginPath();
-  context.moveTo(centerX - 28, quoteEndY + 22);
-  context.lineTo(centerX + 28, quoteEndY + 22);
+  context.moveTo(centerX - 28, quoteEndY + 18);
+  context.lineTo(centerX + 28, quoteEndY + 18);
   context.stroke();
 
   context.fillStyle = "#c5c2bd";
   context.font = `bold 15px "${getFontFamily("bold")}"`;
-  context.fillText(`- ${displayName.slice(0, 24)}`, centerX, quoteEndY + 48);
+  context.fillText(`- ${displayName.slice(0, 24)}`, centerX, quoteEndY + 44);
 
   context.fillStyle = "#8b8885";
   context.font = `13px "${getFontFamily()}"`;
-  context.fillText(`@${username}`.slice(0, 28), centerX, quoteEndY + 68);
+  context.fillText(`@${username}`.slice(0, 28), centerX, quoteEndY + 64);
 
   context.textAlign = "start";
 }
