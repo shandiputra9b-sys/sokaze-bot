@@ -1,0 +1,22 @@
+{
+  "name": "sokaze-bot",
+  "version": "1.0.0",
+  "description": "Discord bot for the Sokaze server using a prefix command system.",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "keywords": [
+    "discord",
+    "bot",
+    "sokaze"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@napi-rs/canvas": "^0.1.65",
+    "discord.js": "^14.19.3",
+    "dotenv": "^16.4.5"
+  }
+}
