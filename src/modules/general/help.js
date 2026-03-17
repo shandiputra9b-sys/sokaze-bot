@@ -1,5 +1,3 @@
-const { EmbedBuilder } = require("discord.js");
-
 const CATEGORY_META = {
   general: {
     label: "General",
@@ -22,6 +20,8 @@ const CATEGORY_META = {
     description: "Command panel dan template layanan ticket."
   }
 };
+
+const MAX_MESSAGE_LENGTH = 1900;
 
 function getCategoryMeta(category) {
   return CATEGORY_META[category] || {
@@ -67,91 +67,90 @@ function findCategoryInput(input, grouped) {
   return null;
 }
 
-function formatCommandLine(command, prefix) {
-  const aliases = command.aliases?.length ? ` | alias: ${command.aliases.join(", ")}` : "";
-  const usage = command.usage ? `\`${prefix}${command.usage}\`` : `\`${prefix}${command.name}\``;
+function formatCommandBlock(command, prefix) {
+  const usage = command.usage ? `${prefix}${command.usage}` : `${prefix}${command.name}`;
+  const lines = [
+    `- \`${usage}\``,
+    `  ${command.description || "Tanpa deskripsi"}`
+  ];
 
-  return [
-    `${usage}`,
-    `${command.description || "Tanpa deskripsi"}${aliases}`
-  ].join("\n");
+  if (command.aliases?.length) {
+    lines.push(`  Alias: ${command.aliases.join(", ")}`);
+  }
+
+  return lines.join("\n");
 }
 
-function buildHelpIndexEmbed(client, grouped) {
-  const embed = new EmbedBuilder()
-    .setColor("#111111")
-    .setTitle("Help Center")
-    .setDescription(
-      [
-        "Daftar command sekarang dibagi per kategori supaya lebih rapi.",
-        `Gunakan \`${client.config.prefix}help <kategori>\` untuk lihat detail command dalam satu kategori.`
-      ].join("\n")
-    )
-    .setTimestamp();
+function buildIndexText(client, grouped) {
+  const lines = [
+    "Daftar kategori command:",
+    ""
+  ];
 
-  const fields = [...grouped.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([category, commands]) => {
-      const meta = getCategoryMeta(category);
+  for (const [category, commands] of [...grouped.entries()].sort(([left], [right]) => left.localeCompare(right))) {
+    const meta = getCategoryMeta(category);
+    lines.push(`${meta.emoji} ${meta.label} (\`${category}\`)`);
+    lines.push(`- ${meta.description}`);
+    lines.push(`- Jumlah command: ${commands.length}`);
+    lines.push(`- Lihat detail: \`${client.config.prefix}help ${category}\``);
+    lines.push("");
+  }
 
-      return {
-        name: `${meta.emoji} ${meta.label}`,
-        value: [
-          meta.description,
-          `Jumlah command: **${commands.length}**`,
-          `Lihat detail: \`${client.config.prefix}help ${category}\``
-        ].join("\n"),
-        inline: false
-      };
-    });
+  lines.push(`Gunakan \`${client.config.prefix}help <kategori>\` untuk membuka daftar command dalam kategori tertentu.`);
 
-  embed.addFields(fields);
-  return embed;
+  return lines.join("\n").trim();
 }
 
-function buildCategoryEmbed(client, category, commands) {
+function buildCategoryChunks(client, category, commands) {
   const meta = getCategoryMeta(category);
-  const embed = new EmbedBuilder()
-    .setColor(category === "moderation" ? "#111827" : "#111111")
-    .setTitle(`${meta.emoji} ${meta.label} Commands`)
-    .setDescription(meta.description)
-    .setFooter({
-      text: `Gunakan ${client.config.prefix}help untuk kembali ke daftar kategori.`
-    })
-    .setTimestamp();
-
-  const lines = commands
+  const blocks = commands
     .sort((left, right) => left.name.localeCompare(right.name))
-    .map((command) => formatCommandLine(command, client.config.prefix));
+    .map((command) => formatCommandBlock(command, client.config.prefix));
 
   const chunks = [];
-  let currentChunk = "";
+  let part = 1;
+  let current = [
+    `${meta.emoji} ${meta.label} Commands`,
+    meta.description,
+    "",
+    `Gunakan \`${client.config.prefix}help\` untuk lihat kategori lain.`
+  ].join("\n");
 
-  for (const line of lines) {
-    const nextChunk = currentChunk ? `${currentChunk}\n\n${line}` : line;
+  for (const block of blocks) {
+    const candidate = `${current}\n\n${block}`;
 
-    if (nextChunk.length > 1024) {
-      chunks.push(currentChunk);
-      currentChunk = line;
+    if (candidate.length <= MAX_MESSAGE_LENGTH) {
+      current = candidate;
       continue;
     }
 
-    currentChunk = nextChunk;
+    chunks.push(current);
+    part += 1;
+    current = [
+      `${meta.emoji} ${meta.label} Commands (Lanjutan ${part})`,
+      meta.description,
+      "",
+      block
+    ].join("\n");
   }
 
-  if (currentChunk) {
-    chunks.push(currentChunk);
+  if (current) {
+    chunks.push(current);
   }
 
-  chunks.forEach((chunk, index) => {
-    embed.addFields({
-      name: index === 0 ? "Commands" : `Commands ${index + 1}`,
-      value: chunk,
-      inline: false
-    });
-  });
+  return chunks;
+}
 
-  return embed;
+async function sendTextChunks(message, chunks) {
+  if (!chunks.length) {
+    return;
+  }
+
+  await message.reply(chunks[0]);
+
+  for (const chunk of chunks.slice(1)) {
+    await message.channel.send(chunk);
+  }
 }
 
 module.exports = {
@@ -165,32 +164,20 @@ module.exports = {
     const requestedCategory = findCategoryInput(args[0], grouped);
 
     if (!args[0]) {
-      await message.reply({
-        embeds: [buildHelpIndexEmbed(client, grouped)]
-      });
+      await message.reply(buildIndexText(client, grouped));
       return;
     }
 
     if (!requestedCategory) {
-      await message.reply({
-        embeds: [
-          new EmbedBuilder()
-            .setColor("#ef4444")
-            .setTitle("Kategori Tidak Ditemukan")
-            .setDescription(
-              [
-                `Kategori \`${args[0]}\` tidak tersedia.`,
-                `Gunakan \`${client.config.prefix}help\` untuk lihat daftar kategori.`
-              ].join("\n")
-            )
-            .setTimestamp()
-        ]
-      });
+      await message.reply(
+        [
+          `Kategori \`${args[0]}\` tidak tersedia.`,
+          `Gunakan \`${client.config.prefix}help\` untuk lihat daftar kategori.`
+        ].join("\n")
+      );
       return;
     }
 
-    await message.reply({
-      embeds: [buildCategoryEmbed(client, requestedCategory, grouped.get(requestedCategory))]
-    });
+    await sendTextChunks(message, buildCategoryChunks(client, requestedCategory, grouped.get(requestedCategory)));
   }
 };
