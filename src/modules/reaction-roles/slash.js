@@ -463,13 +463,6 @@ const slashData = new SlashCommandBuilder()
     subcommand
       .setName("create")
       .setDescription("Buat draft role panel baru")
-      .addChannelOption((option) =>
-        option
-          .setName("channel")
-          .setDescription("Channel target panel")
-          .addChannelTypes(ChannelType.GuildText)
-          .setRequired(false)
-      )
       .addStringOption((option) =>
         option
           .setName("mode")
@@ -488,6 +481,13 @@ const slashData = new SlashCommandBuilder()
       )
       .addStringOption((option) =>
         option.setName("placeholder").setDescription("Placeholder dropdown").setMaxLength(100).setRequired(true)
+      )
+      .addChannelOption((option) =>
+        option
+          .setName("channel")
+          .setDescription("Channel target panel")
+          .addChannelTypes(ChannelType.GuildText)
+          .setRequired(false)
       )
       .addStringOption((option) =>
         option.setName("image_url").setDescription("Header image/banner panel").setMaxLength(1000).setRequired(false)
