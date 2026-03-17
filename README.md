@@ -40,6 +40,17 @@ Bot Discord berbasis JavaScript dengan sistem command prefix `sk`.
 - `sksetcounting #channel [start_number]`
 - `skresetcounting`
 - `skcountingstatus`
+- `sksetmodlog #channel`
+- `skmodpanel @user`
+- `skwarn @user [alasan]`
+- `skwarnings @user`
+- `skclearwarnings @user [alasan]`
+- `sktimeout @user <durasi> [alasan]`
+- `skuntimeout @user [alasan]`
+- `skkick @user [alasan]`
+- `skban @user [alasan]`
+- `skunban <user_id> [alasan]`
+- `skpurge <1-100>`
 - `sksupport`
 - `skiklan`
 - `skverifikasi`
@@ -109,6 +120,17 @@ Atau atur langsung dari Discord dengan command admin:
 - `sksetcounting #channel [start_number]`
 - `skresetcounting`
 - `skcountingstatus`
+- `sksetmodlog #channel`
+- `skmodpanel @user`
+- `skwarn @user [alasan]`
+- `skwarnings @user`
+- `skclearwarnings @user [alasan]`
+- `sktimeout @user <durasi> [alasan]`
+- `skuntimeout @user [alasan]`
+- `skkick @user [alasan]`
+- `skban @user [alasan]`
+- `skunban <user_id> [alasan]`
+- `skpurge <1-100>`
 - `sksupport`
 - `skiklan`
 - `skverifikasi`
@@ -145,6 +167,14 @@ Atau atur langsung dari Discord dengan command admin:
 3. User yang sama tidak boleh dua kali berturut-turut
 4. Jika salah, pesan akan dihapus dan counting direset ke angka awal
 5. Cek status dengan `skcountingstatus`
+
+## Moderation Flow
+
+1. Set channel log moderasi dengan `sksetmodlog`
+2. Buka panel moderasi modern dengan `skmodpanel @user`
+3. Gunakan tombol panel untuk `warn`, `timeout`, `kick`, `ban`, `clear warns`, atau lihat `cases`
+4. Gunakan command cepat seperti `skwarn`, `sktimeout`, `skkick`, `skban`, dan `skpurge` jika butuh aksi langsung
+5. Semua aksi moderasi akan tercatat sebagai case di `data/moderation.json` dan dikirim ke mod log jika channel sudah diatur
 
 ## Name Request Flow
 

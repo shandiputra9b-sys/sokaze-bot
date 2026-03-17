@@ -31,32 +31,34 @@ function writeStore(store) {
   fs.writeFileSync(dataFile, `${JSON.stringify(store, null, 2)}\n`, "utf8");
 }
 
+function isPlainObject(value) {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function mergeSettings(defaults, current) {
+  if (!isPlainObject(defaults) || !isPlainObject(current)) {
+    return current === undefined ? defaults : current;
+  }
+
+  const merged = {
+    ...defaults,
+    ...current
+  };
+
+  for (const key of Object.keys(defaults)) {
+    if (key in current) {
+      merged[key] = mergeSettings(defaults[key], current[key]);
+    }
+  }
+
+  return merged;
+}
+
 function getGuildSettings(guildId, defaults = {}) {
   const store = readStore();
   const guildSettings = store[guildId] || {};
 
-  return {
-    welcome: {
-      ...defaults.welcome,
-      ...(guildSettings.welcome || {})
-    },
-    tickets: {
-      ...defaults.tickets,
-      ...(guildSettings.tickets || {})
-    },
-    confessions: {
-      ...defaults.confessions,
-      ...(guildSettings.confessions || {})
-    },
-    counting: {
-      ...defaults.counting,
-      ...(guildSettings.counting || {})
-    },
-    nameRequests: {
-      ...defaults.nameRequests,
-      ...(guildSettings.nameRequests || {})
-    }
-  };
+  return mergeSettings(defaults, guildSettings);
 }
 
 function updateGuildSettings(guildId, updater) {

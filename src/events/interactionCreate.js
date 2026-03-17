@@ -29,11 +29,19 @@ const {
   QUOTE_CREATE_BUTTON_ID,
   QUOTE_CREATE_MODAL_ID
 } = require("../modules/general/quote");
+const {
+  handleModerationButton,
+  handleModerationModalSubmit
+} = require("../modules/moderation/moderationSystem");
 
 module.exports = {
   name: "interactionCreate",
   async execute(interaction, client) {
     if (interaction.isButton()) {
+      if (await handleModerationButton(interaction, client)) {
+        return;
+      }
+
       if (interaction.customId === NAME_REQUEST_BUTTON_ID) {
         await interaction.showModal(buildNameRequestModal());
         return;
@@ -115,6 +123,10 @@ module.exports = {
     }
 
     if (!interaction.isModalSubmit()) {
+      return;
+    }
+
+    if (await handleModerationModalSubmit(interaction, client)) {
       return;
     }
 
