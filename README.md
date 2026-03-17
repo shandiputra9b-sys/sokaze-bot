@@ -165,6 +165,7 @@ Atau atur langsung dari Discord dengan command admin:
 3. Bot akan membuat quote image dengan background abstrak dari avatar user yang dikutip
 
 Setting per server disimpan di `data/guild-config.json`.
+File di folder `data/` adalah data runtime lokal dan tidak perlu di-push ulang ke GitHub untuk workflow update normal.
 
 ## Struktur modular
 
