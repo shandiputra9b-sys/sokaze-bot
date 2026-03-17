@@ -33,10 +33,49 @@ const {
   handleModerationButton,
   handleModerationModalSubmit
 } = require("../modules/moderation/moderationSystem");
+const {
+  handleRolePanelSelect
+} = require("../modules/reaction-roles/reactionRoleSystem");
 
 module.exports = {
   name: "interactionCreate",
   async execute(interaction, client) {
+    if (interaction.isChatInputCommand()) {
+      const command = client.slashCommands.get(interaction.commandName);
+
+      if (!command) {
+        return;
+      }
+
+      try {
+        await command.executeSlash(interaction, client);
+      } catch (error) {
+        console.error(`Failed to execute slash command "${interaction.commandName}":`, error);
+
+        const payload = {
+          content: "Terjadi error saat menjalankan slash command.",
+          ephemeral: true
+        };
+
+        if (interaction.replied || interaction.deferred) {
+          await interaction.followUp(payload).catch(() => null);
+          return;
+        }
+
+        await interaction.reply(payload).catch(() => null);
+      }
+
+      return;
+    }
+
+    if (interaction.isStringSelectMenu()) {
+      if (await handleRolePanelSelect(interaction, client)) {
+        return;
+      }
+
+      return;
+    }
+
     if (interaction.isButton()) {
       if (await handleModerationButton(interaction, client)) {
         return;

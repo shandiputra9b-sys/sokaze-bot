@@ -26,6 +26,10 @@ function loadCommands(client) {
       continue;
     }
 
+    if (command.prefixEnabled === false) {
+      continue;
+    }
+
     const normalized = {
       category: command.category || "general",
       aliases: [],

@@ -14,6 +14,7 @@ function createBotClient() {
 
   client.commands = new Collection();
   client.commandIndex = new Collection();
+  client.slashCommands = new Collection();
   client.config = config;
 
   return client;
