@@ -51,24 +51,57 @@ async function syncGuildSlashCommands(guild, commands) {
   await guild.commands.set(commands);
 }
 
+async function fetchClientGuilds(client) {
+  const fetchedGuilds = await client.guilds.fetch().catch(() => null);
+  const guildIds = fetchedGuilds
+    ? [...fetchedGuilds.keys()]
+    : [...client.guilds.cache.keys()];
+
+  const resolvedGuilds = await Promise.all(
+    guildIds.map(async (guildId) => client.guilds.cache.get(guildId)
+      || await client.guilds.fetch(guildId).catch(() => null))
+  );
+
+  return resolvedGuilds.filter(Boolean);
+}
+
 async function syncSlashCommands(client) {
   const commands = [...client.slashCommands.values()].map((command) => command.data);
 
   if (!commands.length) {
     return {
       syncedGuilds: 0,
+      attemptedGuilds: 0,
+      failedGuilds: [],
       commandCount: 0
     };
   }
 
-  const guilds = [...client.guilds.cache.values()];
+  const guilds = await fetchClientGuilds(client);
   const results = await Promise.allSettled(
     guilds.map((guild) => syncGuildSlashCommands(guild, commands))
   );
   const syncedGuilds = results.filter((result) => result.status === "fulfilled").length;
+  const failedGuilds = results.flatMap((result, index) => {
+    if (result.status === "fulfilled") {
+      return [];
+    }
+
+    const guild = guilds[index];
+
+    return [
+      {
+        id: guild.id,
+        name: guild.name,
+        reason: result.reason?.message || String(result.reason)
+      }
+    ];
+  });
 
   return {
     syncedGuilds,
+    attemptedGuilds: guilds.length,
+    failedGuilds,
     commandCount: commands.length
   };
 }

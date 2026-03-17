@@ -1,7 +1,7 @@
 const { syncSlashCommands } = require("../loaders/slashCommandLoader");
 
 module.exports = {
-  name: "ready",
+  name: "clientReady",
   once: true,
   async execute(client) {
     console.log(`${client.user.tag} is online with prefix "${client.config.prefix}"`);
@@ -10,7 +10,21 @@ module.exports = {
       const result = await syncSlashCommands(client);
 
       if (result.commandCount > 0) {
-        console.log(`Synced ${result.commandCount} slash command(s) to ${result.syncedGuilds} guild(s).`);
+        console.log(
+          `Synced ${result.commandCount} slash command(s) to ${result.syncedGuilds}/${result.attemptedGuilds} guild(s).`
+        );
+
+        if (!result.attemptedGuilds) {
+          console.warn("No guilds were available for slash command sync.");
+        }
+
+        if (result.failedGuilds.length) {
+          for (const failure of result.failedGuilds) {
+            console.warn(
+              `Failed to sync slash commands for guild ${failure.name} (${failure.id}): ${failure.reason}`
+            );
+          }
+        }
       }
     } catch (error) {
       console.error("Failed to sync slash commands:", error);
