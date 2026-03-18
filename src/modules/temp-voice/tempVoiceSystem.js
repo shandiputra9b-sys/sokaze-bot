@@ -32,6 +32,7 @@ const DEFAULT_TEMP_VOICE_SETTINGS = {
 
 const TEMP_VOICE_PANEL_IMAGE_PATH = path.join(__dirname, "..", "..", "..", "assets", "temp-voice", "panel.png");
 const TEMP_VOICE_PANEL_IMAGE_NAME = "sokaze-temp-voice-panel.png";
+const tempVoicePanelRefreshes = new Map();
 
 const TEMP_VOICE_BUTTON_PREFIX = "tv";
 const TEMP_VOICE_MODAL_PREFIX = "tv-modal";
@@ -376,6 +377,29 @@ async function resolveAnchorChannel(guild, settings) {
   return settings.anchorChannelId ? resolveGuildChannel(guild, settings.anchorChannelId) : null;
 }
 
+async function placeChannelAboveAnchor(guild, voiceChannel, anchorChannel) {
+  if (!voiceChannel || !anchorChannel || voiceChannel.parentId !== anchorChannel.parentId) {
+    return false;
+  }
+
+  if (typeof guild.channels?.setPositions === "function") {
+    await guild.channels.setPositions([
+      {
+        channel: voiceChannel.id,
+        position: anchorChannel.rawPosition
+      }
+    ]).catch(() => null);
+    return true;
+  }
+
+  if (typeof voiceChannel.setPosition === "function") {
+    await voiceChannel.setPosition(anchorChannel.rawPosition).catch(() => null);
+    return true;
+  }
+
+  return false;
+}
+
 async function resolveManagedRoom(guild, room) {
   const voiceChannel = await resolveGuildChannel(guild, room.channelId);
   const textChannel = room.textChannelId ? await resolveGuildChannel(guild, room.textChannelId) : null;
@@ -398,7 +422,8 @@ function resolveCustomEmoji(guild, key) {
     return fallback;
   }
 
-  const emoji = guild.emojis.cache.find((entry) => entry.name === emojiName);
+  const emoji = guild.emojis.cache.find((entry) => entry.name === emojiName)
+    || guild.client.emojis?.cache?.find((entry) => entry.name === emojiName);
 
   if (!emoji) {
     return fallback;
@@ -533,55 +558,69 @@ function buildTempVoicePanelComponents(guild, room, voiceChannel, textChannel) {
 }
 
 async function upsertTempVoicePanel(guild, client, room) {
-  const settings = getTempVoiceSettings(guild.id, client);
-  const { voiceChannel, textChannel } = await resolveManagedRoom(guild, room);
+  const refreshKey = `${guild.id}:${room.channelId}`;
 
-  if (!voiceChannel || voiceChannel.type !== ChannelType.GuildVoice) {
-    return null;
+  if (tempVoicePanelRefreshes.has(refreshKey)) {
+    return tempVoicePanelRefreshes.get(refreshKey);
   }
 
-  const panelChannel = voiceChannel?.isTextBased?.() && voiceChannel.messages
-    ? voiceChannel
-    : await resolvePanelChannel(guild, settings);
+  const refreshPromise = (async () => {
+    const settings = getTempVoiceSettings(guild.id, client);
+    const latestRoom = getRoom(guild.id, room.channelId) || room;
+    const { voiceChannel, textChannel } = await resolveManagedRoom(guild, latestRoom);
 
-  if (!panelChannel) {
-    return null;
-  }
+    if (!voiceChannel || voiceChannel.type !== ChannelType.GuildVoice) {
+      return null;
+    }
 
-  const payload = {
-    embeds: [buildTempVoicePanelEmbed(guild, room, voiceChannel, textChannel)],
-    components: buildTempVoicePanelComponents(guild, room, voiceChannel, textChannel)
-  };
-  const attachment = createPanelAttachment();
+    const panelChannel = voiceChannel?.isTextBased?.() && voiceChannel.messages
+      ? voiceChannel
+      : await resolvePanelChannel(guild, settings);
 
-  if (attachment) {
-    payload.files = [attachment];
-  }
+    if (!panelChannel) {
+      return null;
+    }
 
-  let panelMessage = null;
+    const payload = {
+      embeds: [buildTempVoicePanelEmbed(guild, latestRoom, voiceChannel, textChannel)],
+      components: buildTempVoicePanelComponents(guild, latestRoom, voiceChannel, textChannel)
+    };
+    const attachment = createPanelAttachment();
 
-  if (room.panelMessageId && room.panelChannelId) {
-    const previousChannel = await resolveGuildChannel(guild, room.panelChannelId);
-    panelMessage = previousChannel?.messages
-      ? await previousChannel.messages.fetch(room.panelMessageId).catch(() => null)
-      : null;
-  }
+    if (attachment) {
+      payload.files = [attachment];
+    }
 
-  if (panelMessage && panelMessage.channelId === panelChannel.id) {
-    await panelMessage.edit(payload).catch(() => null);
-  } else {
-    panelMessage = await panelChannel.send(payload).catch(() => null);
-  }
+    let panelMessage = null;
 
-  if (!panelMessage) {
-    return null;
-  }
+    if (latestRoom.panelMessageId && latestRoom.panelChannelId) {
+      const previousChannel = await resolveGuildChannel(guild, latestRoom.panelChannelId);
+      panelMessage = previousChannel?.messages
+        ? await previousChannel.messages.fetch(latestRoom.panelMessageId).catch(() => null)
+        : null;
+    }
 
-  return upsertRoom(guild.id, room.channelId, (current) => ({
-    ...current,
-    panelChannelId: panelChannel.id,
-    panelMessageId: panelMessage.id
-  }));
+    if (panelMessage && panelMessage.channelId === panelChannel.id) {
+      await panelMessage.edit(payload).catch(() => null);
+    } else {
+      panelMessage = await panelChannel.send(payload).catch(() => null);
+    }
+
+    if (!panelMessage) {
+      return null;
+    }
+
+    return upsertRoom(guild.id, latestRoom.channelId, (current) => ({
+      ...current,
+      panelChannelId: panelChannel.id,
+      panelMessageId: panelMessage.id
+    }));
+  })().finally(() => {
+    tempVoicePanelRefreshes.delete(refreshKey);
+  });
+
+  tempVoicePanelRefreshes.set(refreshKey, refreshPromise);
+  return refreshPromise;
 }
 
 async function sendUniversalTempVoiceInterface(channel, client) {
@@ -646,7 +685,7 @@ async function createCompanionTextChannel(guild, room, client) {
     return null;
   }
 
-  const parentId = settings.categoryId || voiceChannel.parentId || null;
+  const parentId = voiceChannel.parentId || settings.categoryId || null;
   const textChannel = await guild.channels.create({
     name: buildChatChannelName(voiceChannel.name),
     type: ChannelType.GuildText,
@@ -783,7 +822,7 @@ async function createTempVoiceRoomForMember(member, client) {
     deleteRoom(member.guild.id, existingRoom.channelId);
   }
 
-  const parentId = settings.categoryId || anchorChannel?.parentId || creatorChannel.parentId || null;
+  const parentId = anchorChannel?.parentId || settings.categoryId || creatorChannel.parentId || null;
   const roomName = buildDefaultRoomName(member);
   const initialRoom = {
     guildId: member.guild.id,
@@ -823,9 +862,7 @@ async function createTempVoiceRoomForMember(member, client) {
     channelId: voiceChannel.id
   }));
 
-  if (anchorChannel && anchorChannel.parentId === voiceChannel.parentId && typeof voiceChannel.setPosition === "function") {
-    await voiceChannel.setPosition(anchorChannel.rawPosition).catch(() => null);
-  }
+  await placeChannelAboveAnchor(member.guild, voiceChannel, anchorChannel);
 
   await member.voice.setChannel(voiceChannel).catch(() => null);
   await upsertTempVoicePanel(member.guild, client, room).catch(() => null);
