@@ -375,6 +375,8 @@ async function handleIdCardModalSubmit(interaction) {
     return true;
   }
 
+  await interaction.deferReply().catch(() => null);
+
   const card = await createIdCardCard({
     ...payload,
     avatarUrl: interaction.user.displayAvatarURL({
@@ -389,9 +391,8 @@ async function handleIdCardModalSubmit(interaction) {
   });
 
   if (!card) {
-    await interaction.reply({
-      content: "Gagal membuat ID card.",
-      ephemeral: true
+    await interaction.editReply({
+      content: "Gagal membuat ID card."
     }).catch(() => null);
     return true;
   }
@@ -402,17 +403,11 @@ async function handleIdCardModalSubmit(interaction) {
     ? `${interaction.user} berhasil membuat ID card dan mendapatkan role ${grantedRole}.`
     : `${interaction.user} berhasil membuat ID card.`;
 
-  await interaction.reply({
+  await interaction.editReply({
     content,
     files: [card],
     components: buildIdCardButtonRow()
-  }).catch(async () => {
-    await interaction.followUp({
-      content,
-      files: [card],
-      components: buildIdCardButtonRow()
-    }).catch(() => null);
-  });
+  }).catch(() => null);
 
   return true;
 }
