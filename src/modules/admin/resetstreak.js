@@ -1,5 +1,9 @@
 const { PermissionFlagsBits } = require("discord.js");
-const { replyWithTemporaryMessage, resetStreakValue } = require("../streak/streakSystem");
+const {
+  refreshStreakTopBoardForGuild,
+  replyWithTemporaryMessage,
+  resetStreakValue
+} = require("../streak/streakSystem");
 
 function extractMentionId(value) {
   return value?.replace(/[<@!>]/g, "") || "";
@@ -30,6 +34,8 @@ module.exports = {
       await replyWithTemporaryMessage(message, "Pair streak itu belum ada.", client);
       return;
     }
+
+    await refreshStreakTopBoardForGuild(message.guild, client, { force: true }).catch(() => null);
 
     await replyWithTemporaryMessage(
       message,

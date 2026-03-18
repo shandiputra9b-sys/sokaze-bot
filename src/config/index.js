@@ -40,8 +40,15 @@ const config = {
     channelId: process.env.STREAK_CHANNEL_ID || "",
     botChannelId: process.env.STREAK_BOT_CHANNEL_ID || process.env.STREAK_CHANNEL_ID || "",
     notificationChannelId: process.env.STREAK_NOTIFICATION_CHANNEL_ID || "",
+    rewardRoleId: process.env.STREAK_REWARD_ROLE_ID || "1483797982720561292",
+    topChannelId: process.env.STREAK_TOP_CHANNEL_ID || "",
     temporaryResponseSeconds: Number.parseInt(process.env.STREAK_TEMP_RESPONSE_SECONDS || "90", 10),
     timezone: process.env.STREAK_TIMEZONE || "Asia/Jakarta"
+  },
+  leaderboards: {
+    channelId: process.env.LEADERBOARD_CHANNEL_ID || "",
+    chatChannelId: process.env.CHAT_TRACKER_CHANNEL_ID || "1482505425973936180",
+    temporaryResponseSeconds: Number.parseInt(process.env.LEADERBOARD_TEMP_RESPONSE_SECONDS || "90", 10)
   },
   nameRequests: {
     panelChannelId: process.env.NAME_REQUEST_PANEL_CHANNEL_ID || "",

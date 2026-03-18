@@ -1,6 +1,8 @@
 const { PermissionFlagsBits } = require("discord.js");
 const {
+  assignStreakRewardRole,
   getStreakSettings,
+  refreshStreakTopBoardForGuild,
   replyWithTemporaryMessage,
   resolveMemberFromId,
   setStreakValue
@@ -52,6 +54,9 @@ module.exports = {
       streakValue,
       getStreakSettings(message.guild.id, client).timezone
     );
+
+    await assignStreakRewardRole(message.guild, client, [userAId, userBId]);
+    await refreshStreakTopBoardForGuild(message.guild, client, { force: true }).catch(() => null);
 
     await replyWithTemporaryMessage(
       message,

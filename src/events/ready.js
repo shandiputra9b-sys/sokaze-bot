@@ -1,4 +1,9 @@
 const { syncSlashCommands } = require("../loaders/slashCommandLoader");
+const {
+  bootstrapVoiceSessions,
+  startLeaderboardScheduler
+} = require("../modules/leaderboards/leaderboardSystem");
+const { startStreakTopBoardScheduler } = require("../modules/streak/streakSystem");
 
 module.exports = {
   name: "clientReady",
@@ -29,5 +34,12 @@ module.exports = {
     } catch (error) {
       console.error("Failed to sync slash commands:", error);
     }
+
+    await bootstrapVoiceSessions(client).catch((error) => {
+      console.error("Failed to bootstrap voice sessions:", error);
+    });
+
+    startStreakTopBoardScheduler(client);
+    startLeaderboardScheduler(client);
   }
 };

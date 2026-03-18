@@ -36,11 +36,22 @@ const {
 const {
   handleRolePanelSelect
 } = require("../modules/reaction-roles/reactionRoleSystem");
+const {
+  isCommandBlockedInGeneralChannel
+} = require("../modules/leaderboards/leaderboardSystem");
 
 module.exports = {
   name: "interactionCreate",
   async execute(interaction, client) {
     if (interaction.isChatInputCommand()) {
+      if (interaction.guildId && isCommandBlockedInGeneralChannel(interaction.guildId, interaction.channelId, client)) {
+        await interaction.reply({
+          content: "Command bot tidak bisa dipakai di channel general ini. Gunakan channel bot ya.",
+          ephemeral: true
+        }).catch(() => null);
+        return;
+      }
+
       const command = client.slashCommands.get(interaction.commandName);
 
       if (!command) {

@@ -1,6 +1,10 @@
 const { parsePrefixedCommand } = require("../utils/commandContext");
 const { handleAutomodMessage } = require("../modules/automod/automodSystem");
 const { handleCountingMessage } = require("../modules/counting/countingSystem");
+const {
+  handleBlockedGeneralChannelCommand,
+  trackChatMessage
+} = require("../modules/leaderboards/leaderboardSystem");
 const { handleStreakMessage } = require("../modules/streak/streakSystem");
 
 module.exports = {
@@ -18,6 +22,12 @@ module.exports = {
 
     const context = parsePrefixedCommand(message.content, client.config.prefix);
 
+    const blockedCommand = await handleBlockedGeneralChannelCommand(message, client, context);
+
+    if (blockedCommand) {
+      return;
+    }
+
     const streakHandled = await handleStreakMessage(message, client, {
       hasPrefixedCommand: Boolean(context)
     });
@@ -27,6 +37,7 @@ module.exports = {
     }
 
     if (!context) {
+      await trackChatMessage(message, client);
       await handleCountingMessage(message, client);
       return;
     }

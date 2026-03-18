@@ -8,6 +8,7 @@ const {
 } = require("../../services/streakStore");
 const { createStreakNotificationCard } = require("./streakCard");
 const { createStreakInfoCard } = require("./streakInfoCard");
+const { createStreakTopBoardCard } = require("./streakTopBoardCard");
 const PENDING_STREAK_EMOJI = "❓";
 
 const STREAK_TIERS = [
@@ -26,6 +27,10 @@ const DEFAULT_STREAK_SETTINGS = {
   channelId: "",
   botChannelId: "",
   notificationChannelId: "",
+  rewardRoleId: "1483797982720561292",
+  topChannelId: "",
+  topMessageId: "",
+  topLastUpdatedDate: "",
   temporaryResponseSeconds: 90,
   timezone: "Asia/Jakarta"
 };
@@ -126,12 +131,40 @@ function setStreakNotificationChannel(guildId, channelId) {
   }));
 }
 
+function setStreakTopChannel(guildId, channelId) {
+  return updateGuildSettings(guildId, (current) => ({
+    ...current,
+    streak: {
+      ...DEFAULT_STREAK_SETTINGS,
+      ...(current.streak || {}),
+      topChannelId: channelId,
+      topMessageId: "",
+      topLastUpdatedDate: ""
+    }
+  }));
+}
+
+function updateStreakTopBoardState(guildId, patch) {
+  return updateGuildSettings(guildId, (current) => ({
+    ...current,
+    streak: {
+      ...DEFAULT_STREAK_SETTINGS,
+      ...(current.streak || {}),
+      ...patch
+    }
+  }));
+}
+
 function getStreakCommandChannelId(settings) {
   return settings.botChannelId || settings.channelId || "";
 }
 
 function getStreakNotificationChannelId(settings) {
   return settings.notificationChannelId || "";
+}
+
+function getStreakTopChannelId(settings) {
+  return settings.topChannelId || "";
 }
 
 function getTemporaryResponseSeconds(settings) {
@@ -304,6 +337,27 @@ function buildStreakBoardCardEmbed(guild, targetMember, data, attachmentName) {
   return embed;
 }
 
+function buildStreakTopBoardEmbed(guild, data, attachmentName) {
+  const embed = new EmbedBuilder()
+    .setColor("#f97316")
+    .setAuthor({
+      name: "Sokaze Top Streak",
+      iconURL: getGuildIconUrl(guild) || undefined
+    })
+    .setDescription("Papan streak server yang diperbarui otomatis setiap hari.")
+    .setFooter({
+      text: `Sokaze Assistant | Total pair: ${data.totalPairs}`,
+      iconURL: getGuildIconUrl(guild) || undefined
+    })
+    .setTimestamp();
+
+  if (attachmentName) {
+    embed.setImage(`attachment://${attachmentName}`);
+  }
+
+  return embed;
+}
+
 async function buildStreakInfoFallbackEmbed(guild, client, targetMember, requestedPage = 1) {
   const data = await buildStreakInfoData(guild, client, targetMember, requestedPage);
   const emojiCollection = await guild.emojis.fetch().catch(() => guild.emojis.cache);
@@ -348,6 +402,37 @@ async function buildStreakInfoFallbackEmbed(guild, client, targetMember, request
 
 async function resolveMemberFromId(guild, memberId) {
   return guild.members.cache.get(memberId) || guild.members.fetch(memberId).catch(() => null);
+}
+
+async function assignStreakRewardRole(guild, client, userIds) {
+  const settings = getStreakSettings(guild.id, client);
+  const rewardRoleId = settings.rewardRoleId;
+
+  if (!rewardRoleId) {
+    return false;
+  }
+
+  const role = guild.roles.cache.get(rewardRoleId) || await guild.roles.fetch(rewardRoleId).catch(() => null);
+
+  if (!role) {
+    return false;
+  }
+
+  const botMember = guild.members.me || await guild.members.fetchMe().catch(() => null);
+
+  if (!botMember || role.position >= botMember.roles.highest.position) {
+    return false;
+  }
+
+  const members = await Promise.all(userIds.map((userId) => resolveMemberFromId(guild, userId)));
+
+  await Promise.allSettled(members.filter(Boolean).map(async (member) => {
+    if (!member.roles.cache.has(role.id)) {
+      await member.roles.add(role, "Granted after streak pair activation");
+    }
+  }));
+
+  return true;
 }
 
 function buildAcceptedPair(guildId, userAId, userBId, dateKey, pendingInvite, acceptedMessageId) {
@@ -543,6 +628,72 @@ async function buildStreakInfoData(guild, client, targetMember, requestedPage = 
   };
 }
 
+async function buildStreakTopBoardData(guild, client) {
+  const settings = getStreakSettings(guild.id, client);
+  const todayDateKey = getTodayDateKey(settings.timezone);
+  const allPairs = listPairs((pair) =>
+    pair.guildId === guild.id
+    && isActivatedPair(pair)
+  ).sort((left, right) => {
+    if ((right.currentStreak || 0) !== (left.currentStreak || 0)) {
+      return (right.currentStreak || 0) - (left.currentStreak || 0);
+    }
+
+    if ((right.bestStreak || 0) !== (left.bestStreak || 0)) {
+      return (right.bestStreak || 0) - (left.bestStreak || 0);
+    }
+
+    return new Date(right.updatedAt || 0).getTime() - new Date(left.updatedAt || 0).getTime();
+  });
+  const topPairs = allPairs.slice(0, 10);
+
+  const entries = await Promise.all(topPairs.map(async (pair, index) => {
+    const [leftMember, rightMember] = await Promise.all([
+      resolveMemberFromId(guild, pair.userIds[0]),
+      resolveMemberFromId(guild, pair.userIds[1])
+    ]);
+
+    const leftUser = leftMember?.user || {
+      id: pair.userIds[0],
+      username: `User ${pair.userIds[0]}`,
+      globalName: "",
+      displayAvatarURL() {
+        return "";
+      }
+    };
+    const rightUser = rightMember?.user || {
+      id: pair.userIds[1],
+      username: `User ${pair.userIds[1]}`,
+      globalName: "",
+      displayAvatarURL() {
+        return "";
+      }
+    };
+
+    return {
+      rank: index + 1,
+      pair,
+      leftUser,
+      rightUser,
+      leftName: truncateLabel(leftMember?.displayName || leftUser.globalName || leftUser.username, 16),
+      rightName: truncateLabel(rightMember?.displayName || rightUser.globalName || rightUser.username, 16),
+      leftHandle: truncateLabel(leftUser.username, 16),
+      rightHandle: truncateLabel(rightUser.username, 16),
+      currentStreak: pair.currentStreak || 0,
+      bestStreak: pair.bestStreak || 0,
+      tier: getStreakTier(Math.max(pair.currentStreak || 1, 1)),
+      completedToday: pair.lastCompletedDate === todayDateKey
+    };
+  }));
+
+  return {
+    guild,
+    entries,
+    timezone: settings.timezone,
+    totalPairs: allPairs.length
+  };
+}
+
 async function buildStreakInfoEmbed(guild, client, targetMember, requestedPage = 1) {
   const data = await buildStreakInfoData(guild, client, targetMember, requestedPage);
   const todayDateKey = getTodayDateKey(data.timezone);
@@ -620,6 +771,101 @@ async function sendStreakInfo(message, client, options = {}) {
   }, client);
 
   return true;
+}
+
+async function refreshStreakTopBoardForGuild(guild, client, options = {}) {
+  const settings = getStreakSettings(guild.id, client);
+  const topChannelId = getStreakTopChannelId(settings);
+
+  if (!topChannelId) {
+    return false;
+  }
+
+  const todayDateKey = getTodayDateKey(settings.timezone);
+  const force = Boolean(options.force);
+
+  const channel = guild.channels.cache.get(topChannelId) || await guild.channels.fetch(topChannelId).catch(() => null);
+
+  if (!channel?.isTextBased?.() || !channel.messages) {
+    return false;
+  }
+
+  let boardMessage = null;
+
+  if (settings.topMessageId) {
+    boardMessage = await channel.messages.fetch(settings.topMessageId).catch(() => null);
+  }
+
+  if (!force && boardMessage && settings.topLastUpdatedDate === todayDateKey) {
+    return false;
+  }
+
+  const data = await buildStreakTopBoardData(guild, client);
+  const card = await createStreakTopBoardCard(data).catch((error) => {
+    console.error(`Failed to render streak top board for guild ${guild.id}:`, error);
+    return null;
+  });
+
+  const payload = {
+    embeds: [buildStreakTopBoardEmbed(guild, data, card?.name)]
+  };
+
+  if (card) {
+    payload.files = [card];
+  }
+
+  if (boardMessage) {
+    await boardMessage.edit(payload).catch(() => null);
+  } else {
+    boardMessage = await channel.send(payload).catch(() => null);
+  }
+
+  if (!boardMessage) {
+    return false;
+  }
+
+  updateStreakTopBoardState(guild.id, {
+    topMessageId: boardMessage.id,
+    topLastUpdatedDate: todayDateKey
+  });
+
+  return true;
+}
+
+async function refreshAllStreakTopBoards(client, options = {}) {
+  const guilds = [...client.guilds.cache.values()];
+
+  await Promise.allSettled(guilds.map(async (guild) => {
+    try {
+      await refreshStreakTopBoardForGuild(guild, client, options);
+    } catch (error) {
+      console.error(`Failed to refresh streak top board for guild ${guild.id}:`, error);
+    }
+  }));
+}
+
+function startStreakTopBoardScheduler(client) {
+  if (client.streakTopBoardScheduler) {
+    return;
+  }
+
+  const runRefresh = async () => {
+    await refreshAllStreakTopBoards(client);
+  };
+
+  runRefresh().catch((error) => {
+    console.error("Initial streak top board refresh failed:", error);
+  });
+
+  client.streakTopBoardScheduler = setInterval(() => {
+    runRefresh().catch((error) => {
+      console.error("Scheduled streak top board refresh failed:", error);
+    });
+  }, 60 * 60 * 1000);
+
+  if (typeof client.streakTopBoardScheduler.unref === "function") {
+    client.streakTopBoardScheduler.unref();
+  }
 }
 
 function getMentionTargetId(message) {
@@ -745,6 +991,7 @@ async function handlePendingAcceptance(message, client, settings, pendingTargetI
   );
 
   await clearPendingInviteReaction(inviteMessage, client);
+  await assignStreakRewardRole(message.guild, client, acceptedPair.userIds);
 
   await completePairStreak(message, acceptedPair, {
     additionalMessages: [inviteMessage]
@@ -975,10 +1222,12 @@ function resetStreakValue(guildId, userAId, userBId) {
 
 module.exports = {
   DEFAULT_STREAK_SETTINGS,
+  assignStreakRewardRole,
   formatStatusLine,
   getStreakSettings,
   getStreakTier,
   handleStreakMessage,
+  refreshStreakTopBoardForGuild,
   replyWithTemporaryMessage,
   resetStreakValue,
   resolveMemberFromId,
@@ -989,5 +1238,7 @@ module.exports = {
   setStreakBotChannel,
   setStreakChannel,
   setStreakNotificationChannel,
-  setStreakValue
+  setStreakTopChannel,
+  setStreakValue,
+  startStreakTopBoardScheduler
 };
