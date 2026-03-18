@@ -2,6 +2,7 @@ const { PermissionFlagsBits } = require("discord.js");
 const { createStreakNotificationCard } = require("../streak/streakCard");
 const {
   getStreakTier,
+  replyWithTemporaryMessage,
   resolveMemberFromId
 } = require("../streak/streakSystem");
 
@@ -14,9 +15,9 @@ module.exports = {
   description: "Preview kartu notifikasi streak tanpa mengubah state pair.",
   category: "admin",
   usage: "previewstreak @user1 @user2 [value]",
-  async execute(message, args) {
+  async execute(message, args, client) {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-      await message.reply("Kamu butuh permission Manage Server untuk command ini.");
+      await replyWithTemporaryMessage(message, "Kamu butuh permission Manage Server untuk command ini.", client);
       return;
     }
 
@@ -25,12 +26,12 @@ module.exports = {
     const streakValue = Number.parseInt(args[2] || "1", 10);
 
     if (!userAId || !userBId || userAId === userBId) {
-      await message.reply("Masukkan dua mention user yang valid dan berbeda.");
+      await replyWithTemporaryMessage(message, "Masukkan dua mention user yang valid dan berbeda.", client);
       return;
     }
 
     if (!Number.isInteger(streakValue) || streakValue < 1) {
-      await message.reply("Nilai preview streak harus angka bulat minimal 1.");
+      await replyWithTemporaryMessage(message, "Nilai preview streak harus angka bulat minimal 1.", client);
       return;
     }
 
@@ -40,7 +41,7 @@ module.exports = {
     ]);
 
     if (!memberA || !memberB) {
-      await message.reply("Salah satu member tidak ditemukan di server.");
+      await replyWithTemporaryMessage(message, "Salah satu member tidak ditemukan di server.", client);
       return;
     }
 
@@ -56,13 +57,13 @@ module.exports = {
     });
 
     if (!card) {
-      await message.reply("Gagal membuat preview streak card.");
+      await replyWithTemporaryMessage(message, "Gagal membuat preview streak card.", client);
       return;
     }
 
-    await message.reply({
+    await replyWithTemporaryMessage(message, {
       content: `Preview tier **${tier.label}** untuk streak **${streakValue}**.`,
       files: [card]
-    });
+    }, client);
   }
 };

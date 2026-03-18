@@ -1,6 +1,6 @@
 const { PermissionFlagsBits } = require("discord.js");
 const {
-  getStreakSettings,
+  replyWithTemporaryMessage,
   resolveMemberFromId,
   sendStreakNotificationToChannel
 } = require("../streak/streakSystem");
@@ -17,7 +17,7 @@ module.exports = {
   usage: "teststreaknotif @user1 @user2 [value]",
   async execute(message, args, client) {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-      await message.reply("Kamu butuh permission Manage Server untuk command ini.");
+      await replyWithTemporaryMessage(message, "Kamu butuh permission Manage Server untuk command ini.", client);
       return;
     }
 
@@ -26,12 +26,12 @@ module.exports = {
     const streakValue = Number.parseInt(args[2] || "1", 10);
 
     if (!userAId || !userBId || userAId === userBId) {
-      await message.reply("Masukkan dua mention user yang valid dan berbeda.");
+      await replyWithTemporaryMessage(message, "Masukkan dua mention user yang valid dan berbeda.", client);
       return;
     }
 
     if (!Number.isInteger(streakValue) || streakValue < 1) {
-      await message.reply("Nilai streak test harus angka bulat minimal 1.");
+      await replyWithTemporaryMessage(message, "Nilai streak test harus angka bulat minimal 1.", client);
       return;
     }
 
@@ -41,27 +41,19 @@ module.exports = {
     ]);
 
     if (!memberA || !memberB) {
-      await message.reply("Salah satu member tidak ditemukan di server.");
+      await replyWithTemporaryMessage(message, "Salah satu member tidak ditemukan di server.", client);
       return;
     }
 
-    const settings = getStreakSettings(message.guild.id, client);
-    const targetChannel = settings.channelId
-      ? await message.guild.channels.fetch(settings.channelId).catch(() => null)
-      : message.channel;
-
-    if (!targetChannel?.send) {
-      await message.reply("Channel streak belum valid. Set dulu pakai `sksetstreakchannel #channel`.");
-      return;
-    }
-
-    await sendStreakNotificationToChannel(targetChannel, {
+    await sendStreakNotificationToChannel(message.channel, {
       userIds: [userAId, userBId],
       currentStreak: streakValue
     });
 
-    await message.reply(
-      `Notifikasi streak test untuk ${memberA} x ${memberB} dikirim ke ${targetChannel}.`
+    await replyWithTemporaryMessage(
+      message,
+      `Notifikasi streak test untuk ${memberA} x ${memberB} dikirim.`,
+      client
     );
   }
 };

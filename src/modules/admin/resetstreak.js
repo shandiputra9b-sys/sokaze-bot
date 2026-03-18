@@ -1,5 +1,5 @@
 const { PermissionFlagsBits } = require("discord.js");
-const { resetStreakValue } = require("../streak/streakSystem");
+const { replyWithTemporaryMessage, resetStreakValue } = require("../streak/streakSystem");
 
 function extractMentionId(value) {
   return value?.replace(/[<@!>]/g, "") || "";
@@ -10,9 +10,9 @@ module.exports = {
   description: "Reset satu pasangan streak.",
   category: "admin",
   usage: "resetstreak @user1 @user2",
-  async execute(message, args) {
+  async execute(message, args, client) {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-      await message.reply("Kamu butuh permission Manage Server untuk command ini.");
+      await replyWithTemporaryMessage(message, "Kamu butuh permission Manage Server untuk command ini.", client);
       return;
     }
 
@@ -20,17 +20,21 @@ module.exports = {
     const userBId = extractMentionId(args[1]);
 
     if (!userAId || !userBId || userAId === userBId) {
-      await message.reply("Masukkan dua mention user yang valid dan berbeda.");
+      await replyWithTemporaryMessage(message, "Masukkan dua mention user yang valid dan berbeda.", client);
       return;
     }
 
     const deleted = resetStreakValue(message.guild.id, userAId, userBId);
 
     if (!deleted) {
-      await message.reply("Pair streak itu belum ada.");
+      await replyWithTemporaryMessage(message, "Pair streak itu belum ada.", client);
       return;
     }
 
-    await message.reply(`Streak untuk <@${userAId}> dan <@${userBId}> berhasil di-reset.`);
+    await replyWithTemporaryMessage(
+      message,
+      `Streak untuk <@${userAId}> dan <@${userBId}> berhasil di-reset.`,
+      client
+    );
   }
 };

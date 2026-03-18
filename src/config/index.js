@@ -38,6 +38,9 @@ const config = {
   },
   streak: {
     channelId: process.env.STREAK_CHANNEL_ID || "",
+    botChannelId: process.env.STREAK_BOT_CHANNEL_ID || process.env.STREAK_CHANNEL_ID || "",
+    notificationChannelId: process.env.STREAK_NOTIFICATION_CHANNEL_ID || "",
+    temporaryResponseSeconds: Number.parseInt(process.env.STREAK_TEMP_RESPONSE_SECONDS || "90", 10),
     timezone: process.env.STREAK_TIMEZONE || "Asia/Jakarta"
   },
   nameRequests: {

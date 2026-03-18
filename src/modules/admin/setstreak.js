@@ -1,5 +1,10 @@
 const { PermissionFlagsBits } = require("discord.js");
-const { getStreakSettings, resolveMemberFromId, setStreakValue } = require("../streak/streakSystem");
+const {
+  getStreakSettings,
+  replyWithTemporaryMessage,
+  resolveMemberFromId,
+  setStreakValue
+} = require("../streak/streakSystem");
 
 function extractMentionId(value) {
   return value?.replace(/[<@!>]/g, "") || "";
@@ -12,7 +17,7 @@ module.exports = {
   usage: "setstreak @user1 @user2 <value>",
   async execute(message, args, client) {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
-      await message.reply("Kamu butuh permission Manage Server untuk command ini.");
+      await replyWithTemporaryMessage(message, "Kamu butuh permission Manage Server untuk command ini.", client);
       return;
     }
 
@@ -21,12 +26,12 @@ module.exports = {
     const streakValue = Number.parseInt(args[2], 10);
 
     if (!userAId || !userBId || userAId === userBId) {
-      await message.reply("Masukkan dua mention user yang valid dan berbeda.");
+      await replyWithTemporaryMessage(message, "Masukkan dua mention user yang valid dan berbeda.", client);
       return;
     }
 
     if (!Number.isInteger(streakValue) || streakValue < 1) {
-      await message.reply("Nilai streak harus angka bulat minimal 1.");
+      await replyWithTemporaryMessage(message, "Nilai streak harus angka bulat minimal 1.", client);
       return;
     }
 
@@ -36,7 +41,7 @@ module.exports = {
     ]);
 
     if (!memberA || !memberB) {
-      await message.reply("Salah satu member tidak ditemukan di server.");
+      await replyWithTemporaryMessage(message, "Salah satu member tidak ditemukan di server.", client);
       return;
     }
 
@@ -48,11 +53,13 @@ module.exports = {
       getStreakSettings(message.guild.id, client).timezone
     );
 
-    await message.reply(
+    await replyWithTemporaryMessage(
+      message,
       [
         `Streak ${memberA} x ${memberB} diset ke **${pair.currentStreak}**.`,
         `Best streak: **${pair.bestStreak}**`
-      ].join("\n")
+      ].join("\n"),
+      client
     );
   }
 };

@@ -24,13 +24,71 @@ const STREAK_TIERS = [
 
 const DEFAULT_STREAK_SETTINGS = {
   channelId: "",
+  botChannelId: "",
+  notificationChannelId: "",
+  temporaryResponseSeconds: 90,
   timezone: "Asia/Jakarta"
+};
+const TIER_COLORS = {
+  ember: "#f97316",
+  blaze: "#fb923c",
+  flare: "#f43f5e",
+  goldfire: "#f59e0b",
+  bluefire: "#38bdf8",
+  sapphire: "#2563eb",
+  soulfire: "#7c3aed",
+  eternal: "#a855f7",
+  mythic: "#ec4899"
+};
+const GENERAL_STREAK_LINES = [
+  "streak kalian sudah {count} hari, pertahankan terus ya.",
+  "api kalian sudah nyala {count} hari, jangan sampai padam.",
+  "{count} hari bareng itu keren, lanjut terus.",
+  "streak {count} hari sudah nyala, jaga ritmenya terus.",
+  "{count} hari bersama, semoga makin konsisten tiap hari."
+];
+const MILESTONE_STREAK_LINES = {
+  1: [
+    "streak kalian baru mulai hari pertama, jaga terus nyalanya.",
+    "hari pertama sudah nyala, lanjutkan terus sampai panjang."
+  ],
+  7: [
+    "7 hari nyala bareng, minggu pertama lewat dengan manis.",
+    "sudah 7 hari, minggu pertama kalian aman. lanjut terus."
+  ],
+  30: [
+    "30 hari nyala itu spesial, pertahankan terus ya.",
+    "sudah 30 hari bersama, streak ini makin serius."
+  ],
+  50: [
+    "50 hari streak bukan angka kecil, kalian hebat.",
+    "streak 50 hari sudah tercapai, jangan kasih padam."
+  ],
+  100: [
+    "100 hari nyala, ini sudah level serius.",
+    "100 hari bareng, api kalian sudah masuk tier tinggi."
+  ],
+  365: [
+    "365 hari nyala, ini satu tahun yang luar biasa.",
+    "satu tahun streak sudah lewat, pertahankan terus apinya."
+  ],
+  500: [
+    "500 hari nyala, ini sudah masuk level legendaris.",
+    "500 hari bersama, streak kalian sudah jadi legenda."
+  ]
 };
 
 function getStreakSettings(guildId, client) {
-  return getGuildSettings(guildId, {
+  const settings = getGuildSettings(guildId, {
     streak: client?.config?.streak || DEFAULT_STREAK_SETTINGS
   }).streak;
+
+  return {
+    ...DEFAULT_STREAK_SETTINGS,
+    ...settings,
+    botChannelId: settings.botChannelId || settings.channelId || DEFAULT_STREAK_SETTINGS.botChannelId,
+    channelId: settings.channelId || settings.botChannelId || DEFAULT_STREAK_SETTINGS.channelId
+  };
 }
 
 function setStreakChannel(guildId, channelId) {
@@ -39,9 +97,61 @@ function setStreakChannel(guildId, channelId) {
     streak: {
       ...DEFAULT_STREAK_SETTINGS,
       ...(current.streak || {}),
-      channelId
+      channelId,
+      botChannelId: channelId
     }
   }));
+}
+
+function setStreakBotChannel(guildId, channelId) {
+  return updateGuildSettings(guildId, (current) => ({
+    ...current,
+    streak: {
+      ...DEFAULT_STREAK_SETTINGS,
+      ...(current.streak || {}),
+      channelId,
+      botChannelId: channelId
+    }
+  }));
+}
+
+function setStreakNotificationChannel(guildId, channelId) {
+  return updateGuildSettings(guildId, (current) => ({
+    ...current,
+    streak: {
+      ...DEFAULT_STREAK_SETTINGS,
+      ...(current.streak || {}),
+      notificationChannelId: channelId
+    }
+  }));
+}
+
+function getStreakCommandChannelId(settings) {
+  return settings.botChannelId || settings.channelId || "";
+}
+
+function getStreakNotificationChannelId(settings) {
+  return settings.notificationChannelId || "";
+}
+
+function getTemporaryResponseSeconds(settings) {
+  const value = Number.parseInt(String(settings.temporaryResponseSeconds || DEFAULT_STREAK_SETTINGS.temporaryResponseSeconds), 10);
+  return Number.isInteger(value) && value > 0 ? value : DEFAULT_STREAK_SETTINGS.temporaryResponseSeconds;
+}
+
+async function replyWithTemporaryMessage(message, payload, client, secondsOverride) {
+  const settings = getStreakSettings(message.guild.id, client);
+  const seconds = secondsOverride || getTemporaryResponseSeconds(settings);
+  const replyPayload = typeof payload === "string" ? { content: payload } : payload;
+  const sentMessage = await message.reply(replyPayload).catch(() => null);
+
+  if (sentMessage) {
+    setTimeout(() => {
+      sentMessage.delete().catch(() => null);
+    }, seconds * 1000);
+  }
+
+  return sentMessage;
 }
 
 function parseRawStreakCommand(content) {
@@ -111,6 +221,146 @@ function formatStatusLine(pair, timezone) {
     `Tier: **${getStreakTier(Math.max(pair.currentStreak, 1)).label}**`,
     `Status hari ini: ${completedToday ? "`selesai`" : "`belum complete`"}`
   ].join("\n");
+}
+
+function getTierColor(tier) {
+  return TIER_COLORS[tier?.key] || "#f97316";
+}
+
+function createSeededIndex(seed, length) {
+  if (!length) {
+    return 0;
+  }
+
+  let value = 0;
+
+  for (const character of seed) {
+    value = ((value * 31) + character.charCodeAt(0)) >>> 0;
+  }
+
+  return value % length;
+}
+
+function pickStreakLine(pair, dateKey) {
+  const streakCount = Math.max(pair.currentStreak || 1, 1);
+  const pool = MILESTONE_STREAK_LINES[streakCount] || GENERAL_STREAK_LINES;
+  const template = pool[createSeededIndex(`${pair.userIds.join(":")}:${dateKey}:${streakCount}`, pool.length)];
+  return template.replace("{count}", String(streakCount));
+}
+
+function getGuildIconUrl(guild) {
+  return guild.iconURL({
+    extension: "png",
+    forceStatic: true,
+    size: 256
+  }) || null;
+}
+
+function buildStreakNotificationEmbed(channel, pair, leftMember, rightMember, tier, tierEmoji, attachmentName) {
+  const embed = new EmbedBuilder()
+    .setColor(getTierColor(tier))
+    .setAuthor({
+      name: "Sokaze Streak Update",
+      iconURL: getGuildIconUrl(channel.guild) || undefined
+    })
+    .setTitle("Streak Notification")
+    .addFields(
+      {
+        name: "Partner",
+        value: `${leftMember} x ${rightMember}`,
+        inline: false
+      },
+      {
+        name: "Total Streak",
+        value: `**${pair.currentStreak}** ${tierEmoji}`,
+        inline: true
+      },
+      {
+        name: "Tier",
+        value: `**${tier.label}**`,
+        inline: true
+      },
+      {
+        name: "Tanggal",
+        value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
+        inline: false
+      }
+    )
+    .setFooter({
+      text: "Sokaze Assistant",
+      iconURL: getGuildIconUrl(channel.guild) || undefined
+    })
+    .setTimestamp();
+
+  if (attachmentName) {
+    embed.setImage(`attachment://${attachmentName}`);
+  }
+
+  return embed;
+}
+
+function buildStreakBoardCardEmbed(guild, targetMember, data, attachmentName) {
+  const embed = new EmbedBuilder()
+    .setColor("#38bdf8")
+    .setAuthor({
+      name: "Sokaze Streak Board",
+      iconURL: getGuildIconUrl(guild) || undefined
+    })
+    .setTitle(`Streak Board - ${targetMember.user.username}`)
+    .setDescription(`Ringkasan partner streak milik ${targetMember}.`)
+    .setFooter({
+      text: `Sokaze Assistant • Halaman ${data.page}/${data.totalPages} • Total partner: ${data.totalPartners}`,
+      iconURL: getGuildIconUrl(guild) || undefined
+    })
+    .setTimestamp();
+
+  if (attachmentName) {
+    embed.setImage(`attachment://${attachmentName}`);
+  }
+
+  return embed;
+}
+
+async function buildStreakInfoFallbackEmbed(guild, client, targetMember, requestedPage = 1) {
+  const data = await buildStreakInfoData(guild, client, targetMember, requestedPage);
+  const emojiCollection = await guild.emojis.fetch().catch(() => guild.emojis.cache);
+  const emojiByName = new Map(emojiCollection.map((emoji) => [emoji.name, emoji]));
+
+  if (!data.totalPartners) {
+    return new EmbedBuilder()
+      .setColor("#38bdf8")
+      .setAuthor({
+        name: "Sokaze Streak Board",
+        iconURL: getGuildIconUrl(guild) || undefined
+      })
+      .setTitle(`Streak Info - ${targetMember.user.username}`)
+      .setDescription("Belum ada partner streak yang aktif untuk user ini.")
+      .setFooter({
+        text: "Sokaze Assistant • Halaman 1/1 • Total partner: 0",
+        iconURL: getGuildIconUrl(guild) || undefined
+      })
+      .setTimestamp();
+  }
+
+  const lines = data.entries.map((entry) => {
+    const tierEmoji = emojiByName.get(entry.tier.emojiName)?.toString() || "🔥";
+    const statusLabel = entry.completedToday ? "✅ Nyala Hari Ini" : "❌ Belum Nyala 😴";
+    return `#${entry.rank} ${entry.partnerName} - ${entry.currentStreak} ${tierEmoji} (${entry.bestStreak}) - ${statusLabel}`;
+  });
+
+  return new EmbedBuilder()
+    .setColor("#38bdf8")
+    .setAuthor({
+      name: "Sokaze Streak Board",
+      iconURL: getGuildIconUrl(guild) || undefined
+    })
+    .setTitle(`Streak Info - ${targetMember.user.username}`)
+    .setDescription(lines.join("\n"))
+    .setFooter({
+      text: `Sokaze Assistant • Halaman ${data.page}/${data.totalPages} • Total partner: ${data.totalPartners}`,
+      iconURL: getGuildIconUrl(guild) || undefined
+    })
+    .setTimestamp();
 }
 
 async function resolveMemberFromId(guild, memberId) {
@@ -201,9 +451,19 @@ async function reactMessagesWithTierEmoji(messages, pair) {
 }
 
 async function sendStreakNotificationToChannel(channel, pair) {
+  const settings = getStreakSettings(channel.guild.id, {
+    config: {
+      streak: DEFAULT_STREAK_SETTINGS
+    }
+  });
+  const notificationChannelId = getStreakNotificationChannelId(settings);
+  const destinationChannel = notificationChannelId
+    ? await channel.guild.channels.fetch(notificationChannelId).catch(() => channel)
+    : channel;
+
   const [leftMember, rightMember] = await Promise.all([
-    resolveMemberFromId(channel.guild, pair.userIds[0]),
-    resolveMemberFromId(channel.guild, pair.userIds[1])
+    resolveMemberFromId(destinationChannel.guild, pair.userIds[0]),
+    resolveMemberFromId(destinationChannel.guild, pair.userIds[1])
   ]);
 
   if (!leftMember || !rightMember) {
@@ -211,6 +471,7 @@ async function sendStreakNotificationToChannel(channel, pair) {
   }
 
   const tier = getStreakTier(Math.max(pair.currentStreak, 1));
+  const tierEmoji = (await resolveTierEmoji(destinationChannel.guild, pair))?.toString() || "🔥";
   const card = await createStreakNotificationCard({
     leftUser: leftMember.user,
     rightUser: rightMember.user,
@@ -221,12 +482,22 @@ async function sendStreakNotificationToChannel(channel, pair) {
     return null;
   });
 
-  const content = `${leftMember} x ${rightMember} baru menyelesaikan streak hari **${pair.currentStreak}**.`;
+  const dateKey = getTodayDateKey(settings.timezone);
+  const content = `${leftMember} ${rightMember} ${pickStreakLine(pair, dateKey)}`;
+  const embed = buildStreakNotificationEmbed(
+    destinationChannel,
+    pair,
+    leftMember,
+    rightMember,
+    tier,
+    tierEmoji,
+    card?.name
+  );
   const payload = card
-    ? { content, files: [card] }
-    : { content };
+    ? { content, embeds: [embed], files: [card] }
+    : { content, embeds: [embed] };
 
-  await channel.send(payload).catch(() => null);
+  await destinationChannel.send(payload).catch(() => null);
 }
 
 async function sendStreakNotification(message, pair) {
@@ -329,11 +600,23 @@ async function buildStreakInfoEmbed(guild, client, targetMember, requestedPage =
 }
 
 async function sendStreakInfo(message, client, options = {}) {
+  const settings = getStreakSettings(message.guild.id, client);
+  const commandChannelId = getStreakCommandChannelId(settings);
+
+  if (commandChannelId && message.channel.id !== commandChannelId) {
+    await replyWithTemporaryMessage(
+      message,
+      `Gunakan \`infostreak\` di <#${commandChannelId}>.`,
+      client
+    );
+    return true;
+  }
+
   const targetId = options.targetId || message.author.id;
   const targetMember = await resolveMemberFromId(message.guild, targetId);
 
   if (!targetMember) {
-    await message.reply("User streak yang diminta tidak ditemukan di server ini.");
+    await replyWithTemporaryMessage(message, "User streak yang diminta tidak ditemukan di server ini.", client);
     return true;
   }
 
@@ -344,18 +627,18 @@ async function sendStreakInfo(message, client, options = {}) {
   });
 
   if (card) {
-    await message.reply({
-      content: `Streak board milik ${targetMember}.`,
+    await replyWithTemporaryMessage(message, {
+      embeds: [buildStreakBoardCardEmbed(message.guild, targetMember, data, card.name)],
       files: [card]
-    }).catch(() => null);
+    }, client);
     return true;
   }
 
-  const embed = await buildStreakInfoEmbed(message.guild, client, targetMember, options.page || 1);
+  const embed = await buildStreakInfoFallbackEmbed(message.guild, client, targetMember, options.page || 1);
 
-  await message.reply({
+  await replyWithTemporaryMessage(message, {
     embeds: [embed]
-  }).catch(() => null);
+  }, client);
 
   return true;
 }
@@ -492,20 +775,21 @@ async function handlePendingAcceptance(message, client, settings, pendingTargetI
 
 async function handleStreakCommand(message, client, targetId) {
   const settings = getStreakSettings(message.guild.id, client);
+  const commandChannelId = getStreakCommandChannelId(settings);
 
-  if (!settings.channelId || message.channel.id !== settings.channelId) {
+  if (!commandChannelId || message.channel.id !== commandChannelId) {
     return false;
   }
 
   if (message.author.id === targetId) {
-    await message.reply("Kamu tidak bisa membuat streak dengan dirimu sendiri.");
+    await replyWithTemporaryMessage(message, "Kamu tidak bisa membuat streak dengan dirimu sendiri.", client);
     return true;
   }
 
   const targetMember = await resolveMemberFromId(message.guild, targetId);
 
   if (!targetMember || targetMember.user.bot) {
-    await message.reply("Target streak tidak valid.");
+    await replyWithTemporaryMessage(message, "Target streak tidak valid.", client);
     return true;
   }
 
@@ -544,11 +828,13 @@ async function handleStreakCommand(message, client, targetId) {
   }
 
   if (existingPair && isActivatedPair(existingPair)) {
-    await message.reply(
+    await replyWithTemporaryMessage(
+      message,
       [
         `${message.author}, streak kamu dengan ${targetMember}:`,
         formatStatusLine(existingPair, settings.timezone)
-      ].join("\n")
+      ].join("\n"),
+      client
     );
     return true;
   }
@@ -642,8 +928,9 @@ async function handleDailyInteraction(message, client) {
 
 async function handleStreakMessage(message, client, options = {}) {
   const settings = getStreakSettings(message.guild.id, client);
+  const commandChannelId = getStreakCommandChannelId(settings);
 
-  if (!settings.channelId || message.channel.id !== settings.channelId) {
+  if (!commandChannelId || message.channel.id !== commandChannelId) {
     return false;
   }
 
@@ -713,12 +1000,15 @@ module.exports = {
   getStreakSettings,
   getStreakTier,
   handleStreakMessage,
+  replyWithTemporaryMessage,
   resetStreakValue,
   resolveMemberFromId,
   resolveStreakTierFromValue,
   sendStreakNotification,
   sendStreakNotificationToChannel,
   sendStreakInfo,
+  setStreakBotChannel,
   setStreakChannel,
+  setStreakNotificationChannel,
   setStreakValue
 };

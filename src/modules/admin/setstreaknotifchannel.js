@@ -1,13 +1,16 @@
 const { PermissionFlagsBits } = require("discord.js");
 const { resolveTextChannel } = require("../../utils/channelResolver");
-const { replyWithTemporaryMessage, setStreakChannel } = require("../streak/streakSystem");
+const {
+  replyWithTemporaryMessage,
+  setStreakNotificationChannel
+} = require("../streak/streakSystem");
 
 module.exports = {
-  name: "setstreakchannel",
-  description: "Atur channel bot untuk command streak dan infostreak.",
-  aliases: ["setstreakbotchannel"],
+  name: "setstreaknotifchannel",
+  description: "Atur channel khusus notifikasi streak.",
+  aliases: ["setstreaknotificationchannel"],
   category: "admin",
-  usage: "setstreakchannel [#channel]",
+  usage: "setstreaknotifchannel [#channel]",
   async execute(message, args, client) {
     if (!message.member.permissions.has(PermissionFlagsBits.ManageGuild)) {
       await replyWithTemporaryMessage(message, "Kamu butuh permission Manage Server untuk command ini.", client);
@@ -19,16 +22,16 @@ module.exports = {
     if (!channel) {
       await replyWithTemporaryMessage(
         message,
-        "Channel bot streak tidak valid. Mention channel teks atau jalankan di channel target.",
+        "Channel notifikasi streak tidak valid. Mention channel teks atau jalankan di channel target.",
         client
       );
       return;
     }
 
-    setStreakChannel(message.guild.id, channel.id);
+    setStreakNotificationChannel(message.guild.id, channel.id);
     await replyWithTemporaryMessage(
       message,
-      `Channel bot streak diset ke ${channel}. Command \`streak @user\` dan \`infostreak\` hanya aktif di sana.`,
+      `Channel notifikasi streak diset ke ${channel}.`,
       client
     );
   }
