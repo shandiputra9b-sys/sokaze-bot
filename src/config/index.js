@@ -54,6 +54,7 @@ const config = {
     creatorChannelId: process.env.TEMP_VOICE_CREATOR_CHANNEL_ID || "",
     panelChannelId: process.env.TEMP_VOICE_PANEL_CHANNEL_ID || "",
     categoryId: process.env.TEMP_VOICE_CATEGORY_ID || "",
+    anchorChannelId: process.env.TEMP_VOICE_ANCHOR_CHANNEL_ID || "1483842795704680549",
     temporaryResponseSeconds: Number.parseInt(process.env.TEMP_VOICE_TEMP_RESPONSE_SECONDS || "90", 10)
   },
   nameRequests: {

@@ -8,7 +8,7 @@ const {
 
 module.exports = {
   name: "settempvoicepanel",
-  description: "Atur text channel untuk panel kontrol Temp Voice.",
+  description: "Atur text channel untuk interface universal Temp Voice dan fallback panel.",
   aliases: ["settvpanel", "settempvoicecontrol"],
   category: "admin",
   usage: "settempvoicepanel [#channel]",
@@ -34,7 +34,7 @@ module.exports = {
 
     await replyWithTemporaryMessage(
       message,
-      `Panel Temp Voice diset ke ${channel}. Room aktif akan mencoba sync panel ke sana.`,
+      `Channel interface universal Temp Voice diset ke ${channel}. Room aktif sekarang prioritas kirim panel ke chat voice room, dan channel ini jadi fallback.`,
       client
     );
   }

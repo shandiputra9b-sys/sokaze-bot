@@ -26,6 +26,7 @@ const DEFAULT_TEMP_VOICE_SETTINGS = {
   creatorChannelId: "",
   panelChannelId: "",
   categoryId: "",
+  anchorChannelId: "1483842795704680549",
   temporaryResponseSeconds: 90
 };
 
@@ -143,6 +144,13 @@ function setTempVoiceCategory(guildId, categoryId) {
   }));
 }
 
+function setTempVoiceAnchorChannel(guildId, channelId) {
+  return updateTempVoiceSettings(guildId, (current) => ({
+    ...current,
+    anchorChannelId: channelId
+  }));
+}
+
 function getTemporaryResponseSeconds(settings) {
   const value = Number.parseInt(String(settings.temporaryResponseSeconds || DEFAULT_TEMP_VOICE_SETTINGS.temporaryResponseSeconds), 10);
   return Number.isInteger(value) && value > 0 ? value : DEFAULT_TEMP_VOICE_SETTINGS.temporaryResponseSeconds;
@@ -193,7 +201,7 @@ function sanitizeDisplayName(value, fallback = "guest") {
 
 function buildDefaultRoomName(member) {
   const baseName = sanitizeDisplayName(member.displayName || member.user.globalName || member.user.username);
-  return `✦ ${baseName}`;
+  return `✦ ${baseName}'s Channel`;
 }
 
 function slugifyChannelName(value, fallback = "voice-room") {
@@ -364,6 +372,10 @@ async function resolvePanelChannel(guild, settings) {
   return channel?.isTextBased?.() && channel.messages ? channel : null;
 }
 
+async function resolveAnchorChannel(guild, settings) {
+  return settings.anchorChannelId ? resolveGuildChannel(guild, settings.anchorChannelId) : null;
+}
+
 async function resolveManagedRoom(guild, room) {
   const voiceChannel = await resolveGuildChannel(guild, room.channelId);
   const textChannel = room.textChannelId ? await resolveGuildChannel(guild, room.textChannelId) : null;
@@ -449,6 +461,7 @@ function buildTempVoicePanelEmbed(guild, room, voiceChannel, textChannel) {
 function buildUniversalTempVoiceEmbed(guild, settings) {
   const creatorMention = settings.creatorChannelId ? `<#${settings.creatorChannelId}>` : "`creator channel belum diset`";
   const panelMention = settings.panelChannelId ? `<#${settings.panelChannelId}>` : "`panel channel belum diset`";
+  const anchorMention = settings.anchorChannelId ? `<#${settings.anchorChannelId}>` : "`anchor channel belum diset`";
   const embed = new EmbedBuilder()
     .setColor("#ec4899")
     .setTitle("TempVoice Interface")
@@ -458,8 +471,9 @@ function buildUniversalTempVoiceEmbed(guild, settings) {
       "",
       `Creator Channel: ${creatorMention}`,
       `Control Panel Channel: ${panelMention}`,
+      `Anchor Channel: ${anchorMention}`,
       "",
-      "Saat room berhasil dibuat, bot akan otomatis mengirim interface kontrol aktif untuk room tersebut."
+      "Saat room berhasil dibuat, bot akan otomatis mengirim interface kontrol aktif langsung ke chat voice room tersebut."
     ].join("\n"))
     .setFooter({
       text: "Sokaze Assistant | Temp Voice universal interface",
@@ -520,15 +534,17 @@ function buildTempVoicePanelComponents(guild, room, voiceChannel, textChannel) {
 
 async function upsertTempVoicePanel(guild, client, room) {
   const settings = getTempVoiceSettings(guild.id, client);
-  const panelChannel = await resolvePanelChannel(guild, settings);
-
-  if (!panelChannel) {
-    return null;
-  }
-
   const { voiceChannel, textChannel } = await resolveManagedRoom(guild, room);
 
   if (!voiceChannel || voiceChannel.type !== ChannelType.GuildVoice) {
+    return null;
+  }
+
+  const panelChannel = voiceChannel?.isTextBased?.() && voiceChannel.messages
+    ? voiceChannel
+    : await resolvePanelChannel(guild, settings);
+
+  if (!panelChannel) {
     return null;
   }
 
@@ -751,6 +767,8 @@ async function createTempVoiceRoomForMember(member, client) {
     return null;
   }
 
+  const anchorChannel = await resolveAnchorChannel(member.guild, settings);
+
   const existingRoom = findRoomByOwner(member.guild.id, member.id);
 
   if (existingRoom) {
@@ -765,7 +783,7 @@ async function createTempVoiceRoomForMember(member, client) {
     deleteRoom(member.guild.id, existingRoom.channelId);
   }
 
-  const parentId = settings.categoryId || creatorChannel.parentId || null;
+  const parentId = settings.categoryId || anchorChannel?.parentId || creatorChannel.parentId || null;
   const roomName = buildDefaultRoomName(member);
   const initialRoom = {
     guildId: member.guild.id,
@@ -804,6 +822,10 @@ async function createTempVoiceRoomForMember(member, client) {
     ...initialRoom,
     channelId: voiceChannel.id
   }));
+
+  if (anchorChannel && anchorChannel.parentId === voiceChannel.parentId && typeof voiceChannel.setPosition === "function") {
+    await voiceChannel.setPosition(anchorChannel.rawPosition).catch(() => null);
+  }
 
   await member.voice.setChannel(voiceChannel).catch(() => null);
   await upsertTempVoicePanel(member.guild, client, room).catch(() => null);
@@ -1330,6 +1352,7 @@ module.exports = {
   handleTempVoiceStateUpdate,
   replyWithTemporaryMessage,
   sendUniversalTempVoiceInterface,
+  setTempVoiceAnchorChannel,
   setTempVoiceCategory,
   setTempVoiceCreatorChannel,
   setTempVoicePanelChannel,
