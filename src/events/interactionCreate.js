@@ -44,6 +44,13 @@ const {
   handleTempVoiceModalSubmit,
   handleTempVoiceSelectMenu
 } = require("../modules/temp-voice/tempVoiceSystem");
+const {
+  handleIdCardButton,
+  handleIdCardModalSubmit
+} = require("../modules/idcard/idCardSystem");
+const {
+  handleStickyModalSubmit
+} = require("../modules/sticky/stickySystem");
 
 module.exports = {
   name: "interactionCreate",
@@ -97,6 +104,10 @@ module.exports = {
     }
 
     if (interaction.isButton()) {
+      if (await handleIdCardButton(interaction, client)) {
+        return;
+      }
+
       if (await handleTempVoiceButton(interaction, client)) {
         return;
       }
@@ -190,6 +201,14 @@ module.exports = {
     }
 
     if (await handleModerationModalSubmit(interaction, client)) {
+      return;
+    }
+
+    if (await handleStickyModalSubmit(interaction, client)) {
+      return;
+    }
+
+    if (await handleIdCardModalSubmit(interaction, client)) {
       return;
     }
 

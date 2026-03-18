@@ -6,11 +6,19 @@ const {
   trackChatMessage
 } = require("../modules/leaderboards/leaderboardSystem");
 const { handleStreakMessage } = require("../modules/streak/streakSystem");
+const { handleStickyMessage } = require("../modules/sticky/stickySystem");
+const { handleIdCardPanelMessage } = require("../modules/idcard/idCardSystem");
 
 module.exports = {
   name: "messageCreate",
   async execute(message, client) {
-    if (message.author.bot || !message.guild) {
+    if (!message.guild) {
+      return;
+    }
+
+    if (message.author.bot) {
+      await handleStickyMessage(message, client);
+      await handleIdCardPanelMessage(message, client);
       return;
     }
 
@@ -39,12 +47,16 @@ module.exports = {
     if (!context) {
       await trackChatMessage(message, client);
       await handleCountingMessage(message, client);
+      await handleStickyMessage(message, client);
+      await handleIdCardPanelMessage(message, client);
       return;
     }
 
     const command = client.commandIndex.get(context.commandName);
 
     if (!command) {
+      await handleStickyMessage(message, client);
+      await handleIdCardPanelMessage(message, client);
       return;
     }
 
@@ -54,5 +66,8 @@ module.exports = {
       console.error(`Failed to execute command "${context.commandName}":`, error);
       await message.reply("Terjadi error saat menjalankan command.");
     }
+
+    await handleStickyMessage(message, client);
+    await handleIdCardPanelMessage(message, client);
   }
 };

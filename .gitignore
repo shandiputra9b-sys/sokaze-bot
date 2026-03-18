@@ -3,3 +3,4 @@ node_modules
 npm-debug.log*
 data/*.json
 !data/.gitkeep
+assets/idcard-preview.png

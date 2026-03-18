@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ID Card Layout Dashboard</title>
+  <style>
+    @font-face {
+      font-family: "ID Dashboard Font";
+      src: url("/api/font") format("opentype");
+      font-display: swap;
+    }
+
+    :root {
+      color-scheme: dark;
+      --bg: #0a0a0b;
+      --panel: #141416;
+      --panel-2: #1c1d20;
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f5f5f5;
+      --muted: #a5a7ac;
+      --accent: #f1f5f9;
+      --selected: #38bdf8;
+      --danger: #f43f5e;
+      --success: #22c55e;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at top left, rgba(255, 255, 255, 0.04), transparent 32%),
+        linear-gradient(180deg, #09090b 0%, #0d0d10 100%);
+      color: var(--text);
+      font: 14px/1.4 "Segoe UI", sans-serif;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: minmax(680px, 1fr) 420px;
+      gap: 20px;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .panel {
+      background: rgba(20, 20, 22, 0.92);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+    }
+
+    .workspace {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      min-width: 0;
+    }
+
+    .workspace-header,
+    .sidebar-section {
+      padding: 16px 18px;
+    }
+
+    .workspace-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .workspace-header h1,
+    .sidebar-section h2 {
+      margin: 0 0 6px;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .workspace-header p,
+    .sidebar-section p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    button {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--panel-2);
+      color: var(--text);
+      font: inherit;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: 0.16s ease;
+    }
+
+    button:hover {
+      border-color: rgba(255, 255, 255, 0.18);
+      transform: translateY(-1px);
+    }
+
+    button.primary {
+      background: linear-gradient(180deg, #1d4ed8, #1e40af);
+      border-color: rgba(96, 165, 250, 0.4);
+    }
+
+    button.success {
+      background: linear-gradient(180deg, #15803d, #166534);
+      border-color: rgba(74, 222, 128, 0.35);
+    }
+
+    button.ghost {
+      background: transparent;
+    }
+
+    button.danger {
+      background: linear-gradient(180deg, #be123c, #881337);
+      border-color: rgba(244, 63, 94, 0.4);
+    }
+
+    .stage-shell {
+      padding: 0 16px 16px;
+      min-width: 0;
+    }
+
+    .stage-scroll {
+      border-radius: 18px;
+      overflow: auto;
+      border: 1px solid var(--border);
+      background: #09090b;
+      padding: 14px;
+    }
+
+    .stage {
+      position: relative;
+      width: 100%;
+      min-width: 860px;
+    }
+
+    .stage img {
+      display: block;
+      width: 100%;
+      height: auto;
+      border-radius: 14px;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 0;
+    }
+
+    .overlay-item {
+      position: absolute;
+      border: 2px dashed rgba(255, 255, 255, 0.45);
+      background: rgba(255, 255, 255, 0.08);
+      user-select: none;
+    }
+
+    .overlay-item[data-shape="circle"] {
+      border-radius: 999px;
+    }
+
+    .overlay-item.selected {
+      border-color: var(--selected);
+      background: rgba(56, 189, 248, 0.18);
+      box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.14);
+    }
+
+    .overlay-item .label {
+      position: absolute;
+      top: -28px;
+      left: 0;
+      background: rgba(15, 23, 42, 0.94);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+      letter-spacing: 0.02em;
+    }
+
+    .text-preview {
+      position: absolute;
+      inset: 0;
+      padding: 0;
+      color: #f3f4f6;
+      font-family: "ID Dashboard Font", "Times New Roman", serif;
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.82);
+      pointer-events: none;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .text-preview.bio {
+      white-space: normal;
+      text-overflow: clip;
+      line-height: 1.16;
+    }
+
+    .overlay-item .handle {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      right: -8px;
+      bottom: -8px;
+      border-radius: 50%;
+      border: 2px solid #fff;
+      background: var(--selected);
+      cursor: nwse-resize;
+    }
+
+    .overlay-item[data-shape="circle"] .handle {
+      right: -8px;
+      top: calc(50% - 7px);
+      bottom: auto;
+      cursor: ew-resize;
+    }
+
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .sidebar-section {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .status {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .status.success {
+      color: #86efac;
+    }
+
+    .status.error {
+      color: #fda4af;
+    }
+
+    .selector-grid,
+    .controls-grid,
+    .preview-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .selector-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .controls-grid,
+    .preview-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .field.full {
+      grid-column: 1 / -1;
+    }
+
+    .selector-grid button {
+      justify-content: flex-start;
+      text-align: left;
+    }
+
+    .selector-grid button.active {
+      border-color: rgba(56, 189, 248, 0.7);
+      background: rgba(56, 189, 248, 0.14);
+    }
+
+    label {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    input,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #0f1013;
+      color: var(--text);
+      padding: 10px 12px;
+      font: 14px/1.4 "Segoe UI", sans-serif;
+    }
+
+    textarea {
+      min-height: 104px;
+      resize: vertical;
+    }
+
+    .hint {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .preview-frame {
+      overflow: hidden;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: #09090b;
+    }
+
+    .preview-frame img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    @media (max-width: 1280px) {
+      .app {
+        grid-template-columns: 1fr;
+      }
+
+      .stage {
+        min-width: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <section class="workspace">
+      <div class="panel workspace-header">
+        <div>
+          <h1>ID Card Layout Dashboard</h1>
+          <p>Geser elemen di atas template, ubah ukurannya, lalu simpan ke config yang dipakai renderer.</p>
+        </div>
+        <div class="button-row">
+          <button class="ghost" id="reload-layout">Reload</button>
+          <button class="success" id="save-layout">Save Layout</button>
+          <button class="primary" id="refresh-preview">Refresh Preview</button>
+        </div>
+      </div>
+
+      <div class="panel stage-shell">
+        <div class="stage-scroll">
+          <div class="stage" id="stage">
+            <img id="template-image" alt="ID Card Template" src="/api/template" />
+            <div class="overlay" id="overlay"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="sidebar">
+      <section class="panel sidebar-section">
+        <div>
+          <h2>Selected Element</h2>
+          <p>Pilih elemen lalu ubah angka di bawah. Drag di canvas juga langsung mengubah nilainya.</p>
+        </div>
+        <div class="selector-grid" id="element-buttons"></div>
+        <div class="controls-grid" id="controls-grid"></div>
+        <div class="status" id="layout-status">Config loaded.</div>
+      </section>
+
+      <section class="panel sidebar-section">
+        <div>
+          <h2>Preview Data</h2>
+          <p>Data ini hanya untuk uji visual dashboard. Renderer ID card nanti tetap pakai data user sebenarnya.</p>
+        </div>
+        <div class="preview-grid">
+          <label class="field">
+            Name
+            <input id="preview-name" />
+          </label>
+          <label class="field">
+            Age
+            <input id="preview-age" />
+          </label>
+          <label class="field">
+            City
+            <input id="preview-city" />
+          </label>
+          <label class="field full">
+            Bio
+            <textarea id="preview-bio"></textarea>
+          </label>
+        </div>
+        <p class="hint">Tip: tekan tombol save dulu kalau mau preview kanan pakai posisi terbaru.</p>
+      </section>
+
+      <section class="panel sidebar-section">
+        <div>
+          <h2>Actual Preview</h2>
+          <p>Panel ini merender hasil lewat engine Node yang sama dengan bot, jadi lebih akurat dari overlay editor.</p>
+        </div>
+        <div class="preview-frame">
+          <img id="preview-image" alt="Rendered ID Card Preview" />
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <script>
+    const stage = document.getElementById("stage");
+    const overlay = document.getElementById("overlay");
+    const elementButtons = document.getElementById("element-buttons");
+    const controlsGrid = document.getElementById("controls-grid");
+    const layoutStatus = document.getElementById("layout-status");
+    const previewImage = document.getElementById("preview-image");
+
+    const previewInputs = {
+      name: document.getElementById("preview-name"),
+      age: document.getElementById("preview-age"),
+      city: document.getElementById("preview-city"),
+      bio: document.getElementById("preview-bio")
+    };
+
+    const elementMeta = {
+      "fields.name": { label: "Name", shape: "rect" },
+      "fields.age": { label: "Age", shape: "rect" },
+      "fields.city": { label: "City", shape: "rect" },
+      "fields.bio": { label: "Bio", shape: "rect" },
+      "avatar": { label: "Avatar", shape: "circle-box" },
+      "mask": { label: "Mask", shape: "circle" }
+    };
+
+    const state = {
+      layout: null,
+      defaults: null,
+      selectedKey: "fields.name",
+      drag: null
+    };
+
+    function setStatus(message, tone = "") {
+      layoutStatus.textContent = message;
+      layoutStatus.className = `status${tone ? ` ${tone}` : ""}`;
+    }
+
+    function clone(value) {
+      return JSON.parse(JSON.stringify(value));
+    }
+
+    function getScale() {
+      const rect = stage.getBoundingClientRect();
+      return rect.width / state.layout.template.width;
+    }
+
+    function readPath(root, path) {
+      return path.split(".").reduce((value, key) => value[key], root);
+    }
+
+    function writePath(root, path, value) {
+      const parts = path.split(".");
+      const finalKey = parts.pop();
+      const target = parts.reduce((ref, key) => ref[key], root);
+      target[finalKey] = value;
+    }
+
+    function getSelectedValue() {
+      return readPath(state.layout, state.selectedKey);
+    }
+
+    function buildItems() {
+      return Object.entries(elementMeta).map(([key, meta]) => {
+        const value = readPath(state.layout, key);
+        let box;
+
+        if (key.startsWith("fields.")) {
+          box = {
+            x: value.x,
+            y: value.y,
+            width: value.width,
+            height: key === "fields.bio" ? value.height : Math.max(42, value.fontSize + 12)
+          };
+        } else if (key === "avatar") {
+          box = {
+            x: value.x,
+            y: value.y,
+            width: value.size,
+            height: value.size
+          };
+        } else {
+          box = {
+            x: value.centerX - value.radius,
+            y: value.centerY - value.radius,
+            width: value.radius * 2,
+            height: value.radius * 2
+          };
+        }
+
+        return { key, meta, value, box };
+      });
+    }
+
+    function renderElementButtons() {
+      elementButtons.innerHTML = "";
+
+      for (const [key, meta] of Object.entries(elementMeta)) {
+        const button = document.createElement("button");
+        button.textContent = meta.label;
+        button.className = key === state.selectedKey ? "active" : "";
+        button.addEventListener("click", () => {
+          state.selectedKey = key;
+          renderElementButtons();
+          renderControls();
+          renderOverlay();
+        });
+        elementButtons.appendChild(button);
+      }
+    }
+
+    function renderControls() {
+      const value = getSelectedValue();
+      controlsGrid.innerHTML = "";
+
+      const controls = [];
+
+      if (state.selectedKey.startsWith("fields.")) {
+        controls.push(["x", "number"], ["y", "number"], ["width", "number"]);
+
+        if (state.selectedKey === "fields.bio") {
+          controls.push(["height", "number"], ["startFontSize", "number"], ["minFontSize", "number"], ["lineHeightFactor", "number"]);
+        } else {
+          controls.push(["fontSize", "number"]);
+        }
+      } else if (state.selectedKey === "avatar") {
+        controls.push(["x", "number"], ["y", "number"], ["size", "number"], ["radius", "number"]);
+      } else {
+        controls.push(["centerX", "number"], ["centerY", "number"], ["radius", "number"]);
+      }
+
+      for (const [field, type] of controls) {
+        const wrapper = document.createElement("label");
+        wrapper.className = "field";
+        wrapper.textContent = field;
+
+        const input = document.createElement("input");
+        input.type = type;
+        input.step = field === "lineHeightFactor" ? "0.01" : "1";
+        input.value = value[field];
+        input.addEventListener("input", () => {
+          value[field] = field === "lineHeightFactor" ? Number.parseFloat(input.value) || 0 : Number.parseInt(input.value, 10) || 0;
+          renderOverlay();
+          renderControls();
+        });
+
+        wrapper.appendChild(input);
+        controlsGrid.appendChild(wrapper);
+      }
+    }
+
+    function refreshPreviewImage() {
+      const query = new URLSearchParams({
+        name: previewInputs.name.value || "",
+        age: previewInputs.age.value || "",
+        city: previewInputs.city.value || "",
+        bio: previewInputs.bio.value || "",
+        ts: Date.now().toString()
+      });
+
+      previewImage.src = `/api/preview?${query.toString()}`;
+    }
+
+    function renderOverlay() {
+      overlay.innerHTML = "";
+      const scale = getScale();
+      const previewValues = {
+        "fields.name": previewInputs.name.value || state.layout.previewData.name || "Sokaa",
+        "fields.age": previewInputs.age.value || state.layout.previewData.age || "20 Tahun",
+        "fields.city": previewInputs.city.value || state.layout.previewData.city || "Bandung",
+        "fields.bio": previewInputs.bio.value || state.layout.previewData.bio || "Bio preview"
+      };
+
+      for (const item of buildItems()) {
+        const node = document.createElement("div");
+        node.className = `overlay-item${item.key === state.selectedKey ? " selected" : ""}`;
+        node.dataset.key = item.key;
+        node.dataset.shape = item.meta.shape.includes("circle") ? "circle" : "rect";
+        node.style.left = `${item.box.x * scale}px`;
+        node.style.top = `${item.box.y * scale}px`;
+        node.style.width = `${item.box.width * scale}px`;
+        node.style.height = `${item.box.height * scale}px`;
+
+        if (item.meta.shape === "circle-box") {
+          node.style.borderRadius = "24px";
+          const circle = document.createElement("div");
+          circle.style.position = "absolute";
+          circle.style.inset = "0";
+          circle.style.borderRadius = "999px";
+          circle.style.border = "2px solid rgba(255,255,255,0.28)";
+          node.appendChild(circle);
+        }
+
+        const label = document.createElement("div");
+        label.className = "label";
+        label.textContent = item.meta.label;
+        node.appendChild(label);
+
+        if (item.key.startsWith("fields.")) {
+          const preview = document.createElement("div");
+          preview.className = `text-preview${item.key === "fields.bio" ? " bio" : ""}`;
+          preview.textContent = previewValues[item.key];
+          preview.style.fontSize = `${(item.value.fontSize || item.value.startFontSize || 28) * scale}px`;
+          preview.style.padding = item.key === "fields.bio" ? "8px 10px" : "0";
+          preview.style.lineHeight = item.key === "fields.bio"
+            ? String(item.value.lineHeightFactor || 1.16)
+            : "1.1";
+          preview.style.display = "flex";
+          preview.style.alignItems = item.key === "fields.bio" ? "flex-start" : "center";
+          node.appendChild(preview);
+        }
+
+        const handle = document.createElement("div");
+        handle.className = "handle";
+        handle.dataset.handle = "resize";
+        node.appendChild(handle);
+
+        node.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          state.selectedKey = item.key;
+          renderElementButtons();
+          renderControls();
+          renderOverlay();
+
+          const box = item.box;
+          const stageScale = getScale();
+          const startX = event.clientX;
+          const startY = event.clientY;
+          const resize = event.target.dataset.handle === "resize";
+
+          state.drag = {
+            key: item.key,
+            resize,
+            startX,
+            startY,
+            stageScale,
+            original: clone(readPath(state.layout, item.key)),
+            originalBox: clone(box)
+          };
+        });
+
+        overlay.appendChild(node);
+      }
+    }
+
+    function handlePointerMove(event) {
+      if (!state.drag) {
+        return;
+      }
+
+      const dx = (event.clientX - state.drag.startX) / state.drag.stageScale;
+      const dy = (event.clientY - state.drag.startY) / state.drag.stageScale;
+      const value = readPath(state.layout, state.drag.key);
+
+      if (!state.drag.resize) {
+        if (state.drag.key.startsWith("fields.")) {
+          value.x = Math.round(state.drag.original.x + dx);
+          value.y = Math.round(state.drag.original.y + dy);
+        } else if (state.drag.key === "avatar") {
+          value.x = Math.round(state.drag.original.x + dx);
+          value.y = Math.round(state.drag.original.y + dy);
+        } else {
+          value.centerX = Math.round(state.drag.original.centerX + dx);
+          value.centerY = Math.round(state.drag.original.centerY + dy);
+        }
+      } else if (state.drag.key.startsWith("fields.")) {
+        value.width = Math.max(40, Math.round(state.drag.original.width + dx));
+
+        if (state.drag.key === "fields.bio") {
+          value.height = Math.max(40, Math.round(state.drag.original.height + dy));
+        }
+      } else if (state.drag.key === "avatar") {
+        const size = Math.max(80, Math.round(state.drag.original.size + dx));
+        value.size = size;
+        value.radius = Math.round(size / 2);
+      } else {
+        value.radius = Math.max(40, Math.round(state.drag.original.radius + dx));
+      }
+
+      renderControls();
+      renderOverlay();
+    }
+
+    function handlePointerUp() {
+      state.drag = null;
+    }
+
+    async function loadLayout() {
+      const response = await fetch("/api/layout");
+      const data = await response.json();
+      state.layout = data.layout;
+      state.defaults = data.defaults;
+
+      for (const [key, input] of Object.entries(previewInputs)) {
+        input.value = state.layout.previewData[key] || "";
+      }
+
+      renderElementButtons();
+      renderControls();
+      renderOverlay();
+      refreshPreviewImage();
+      setStatus("Config loaded.", "success");
+    }
+
+    async function saveLayout() {
+      state.layout.previewData = {
+        name: previewInputs.name.value,
+        age: previewInputs.age.value,
+        city: previewInputs.city.value,
+        bio: previewInputs.bio.value
+      };
+
+      const response = await fetch("/api/layout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ layout: state.layout })
+      });
+
+      if (!response.ok) {
+        setStatus("Gagal menyimpan layout.", "error");
+        return;
+      }
+
+      const payload = await response.json();
+      state.layout = payload.layout;
+      setStatus("Layout tersimpan ke idCardLayout.json", "success");
+      renderControls();
+      renderOverlay();
+      refreshPreviewImage();
+    }
+
+    function resetSelected() {
+      if (!state.defaults) {
+        return;
+      }
+
+      writePath(state.layout, state.selectedKey, clone(readPath(state.defaults, state.selectedKey)));
+      renderControls();
+      renderOverlay();
+      setStatus("Elemen dipulihkan ke nilai default.", "success");
+    }
+
+    document.getElementById("reload-layout").addEventListener("click", () => {
+      loadLayout().catch(() => setStatus("Gagal memuat config.", "error"));
+    });
+
+    document.getElementById("save-layout").addEventListener("click", () => {
+      saveLayout().catch(() => setStatus("Gagal menyimpan config.", "error"));
+    });
+
+    document.getElementById("refresh-preview").addEventListener("click", () => {
+      refreshPreviewImage();
+      setStatus("Preview dirender ulang.", "success");
+    });
+
+    const resetButton = document.createElement("button");
+    resetButton.textContent = "Reset Selected";
+    resetButton.className = "danger";
+    resetButton.addEventListener("click", resetSelected);
+    document.querySelector(".workspace-header .button-row").appendChild(resetButton);
+
+    Object.values(previewInputs).forEach((input) => {
+      input.addEventListener("input", () => {
+        renderOverlay();
+      });
+      input.addEventListener("change", refreshPreviewImage);
+    });
+
+    document.getElementById("template-image").addEventListener("load", renderOverlay);
+    window.addEventListener("mousemove", handlePointerMove);
+    window.addEventListener("mouseup", handlePointerUp);
+    window.addEventListener("resize", renderOverlay);
+
+    loadLayout().catch(() => setStatus("Gagal memuat dashboard.", "error"));
+  </script>
+</body>
+</html>
