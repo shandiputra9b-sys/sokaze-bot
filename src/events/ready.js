@@ -3,6 +3,7 @@ const {
   bootstrapVoiceSessions,
   startLeaderboardScheduler
 } = require("../modules/leaderboards/leaderboardSystem");
+const { refreshAllMusicBoards } = require("../modules/music/musicBoardSystem");
 const { startStreakTopBoardScheduler } = require("../modules/streak/streakSystem");
 
 module.exports = {
@@ -41,5 +42,8 @@ module.exports = {
 
     startStreakTopBoardScheduler(client);
     startLeaderboardScheduler(client);
+    await refreshAllMusicBoards(client).catch((error) => {
+      console.error("Failed to refresh music boards:", error);
+    });
   }
 };
