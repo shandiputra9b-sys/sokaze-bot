@@ -8,6 +8,7 @@ const {
 } = require("../../services/streakStore");
 const { createStreakNotificationCard } = require("./streakCard");
 const { createStreakInfoCard } = require("./streakInfoCard");
+const PENDING_STREAK_EMOJI = "❓";
 
 const STREAK_TIERS = [
   { key: "ember", min: 1, max: 6, emojiName: "streak_ember", assetFile: "ember.png", label: "Ember" },
@@ -144,22 +145,65 @@ function buildAcceptedPair(guildId, userAId, userBId, dateKey, pendingInvite, ac
   }));
 }
 
-async function reactWithTierEmoji(message, pair) {
+async function resolveTierEmoji(guild, pair) {
   const tier = getStreakTier(Math.max(pair.currentStreak, 1));
-  const guildEmoji = message.guild.emojis.cache.find((emoji) => emoji.name === tier.emojiName)
-    || await message.guild.emojis.fetch().then((emojis) => emojis.find((emoji) => emoji.name === tier.emojiName)).catch(() => null);
+  return guild.emojis.cache.find((emoji) => emoji.name === tier.emojiName)
+    || await guild.emojis.fetch().then((emojis) => emojis.find((emoji) => emoji.name === tier.emojiName)).catch(() => null);
+}
+
+async function fetchPendingInviteMessage(guild, pendingInvite) {
+  if (!pendingInvite?.channelId || !pendingInvite?.messageId) {
+    return null;
+  }
+
+  const channel = guild.channels.cache.get(pendingInvite.channelId)
+    || await guild.channels.fetch(pendingInvite.channelId).catch(() => null);
+
+  if (!channel?.messages) {
+    return null;
+  }
+
+  return channel.messages.fetch(pendingInvite.messageId).catch(() => null);
+}
+
+async function addPendingInviteReaction(message) {
+  await message.react(PENDING_STREAK_EMOJI).catch(() => null);
+}
+
+async function clearPendingInviteReaction(message, client) {
+  if (!message || !client?.user) {
+    return;
+  }
+
+  const reaction = message.reactions.cache.find((entry) => entry.emoji.name === PENDING_STREAK_EMOJI);
+
+  if (!reaction) {
+    return;
+  }
+
+  await reaction.users.remove(client.user.id).catch(() => null);
+}
+
+async function reactMessagesWithTierEmoji(messages, pair) {
+  const uniqueMessages = [...new Set(messages.filter(Boolean))];
+
+  if (!uniqueMessages.length) {
+    return;
+  }
+
+  const guildEmoji = await resolveTierEmoji(uniqueMessages[0].guild, pair);
 
   if (!guildEmoji) {
     return;
   }
 
-  await message.react(guildEmoji).catch(() => null);
+  await Promise.allSettled(uniqueMessages.map((message) => message.react(guildEmoji).catch(() => null)));
 }
 
-async function sendStreakNotification(message, pair) {
+async function sendStreakNotificationToChannel(channel, pair) {
   const [leftMember, rightMember] = await Promise.all([
-    resolveMemberFromId(message.guild, pair.userIds[0]),
-    resolveMemberFromId(message.guild, pair.userIds[1])
+    resolveMemberFromId(channel.guild, pair.userIds[0]),
+    resolveMemberFromId(channel.guild, pair.userIds[1])
   ]);
 
   if (!leftMember || !rightMember) {
@@ -182,7 +226,11 @@ async function sendStreakNotification(message, pair) {
     ? { content, files: [card] }
     : { content };
 
-  await message.channel.send(payload).catch(() => null);
+  await channel.send(payload).catch(() => null);
+}
+
+async function sendStreakNotification(message, pair) {
+  return sendStreakNotificationToChannel(message.channel, pair);
 }
 
 async function buildStreakInfoData(guild, client, targetMember, requestedPage = 1) {
@@ -387,9 +435,11 @@ function finalizeDailyCompletion(pair, dateKey, completionMessageId, dailyState)
   };
 }
 
-async function completePairStreak(message, pair) {
+async function completePairStreak(message, pair, options = {}) {
+  const additionalMessages = options.additionalMessages || [];
+
   await Promise.allSettled([
-    reactWithTierEmoji(message, pair),
+    reactMessagesWithTierEmoji([message, ...additionalMessages], pair),
     sendStreakNotification(message, pair)
   ]);
 }
@@ -422,6 +472,7 @@ async function handlePendingAcceptance(message, client, settings, pendingTargetI
 
   const pending = pendingPair.pendingInvite;
   const dateKey = getTodayDateKey(settings.timezone);
+  const inviteMessage = await fetchPendingInviteMessage(message.guild, pending);
   const acceptedPair = buildAcceptedPair(
     message.guild.id,
     pending.requesterId,
@@ -431,15 +482,11 @@ async function handlePendingAcceptance(message, client, settings, pendingTargetI
     message.id
   );
 
-  await message.reply(
-    [
-      `${message.author} menerima streak dari <@${pending.requesterId}>.`,
-      `Streak dimulai di hari **${acceptedPair.currentStreak}**.`,
-      `Tier: **${getStreakTier(acceptedPair.currentStreak).label}**`
-    ].join("\n")
-  ).catch(() => null);
+  await clearPendingInviteReaction(inviteMessage, client);
 
-  await completePairStreak(message, acceptedPair);
+  await completePairStreak(message, acceptedPair, {
+    additionalMessages: [inviteMessage]
+  });
   return true;
 }
 
@@ -472,9 +519,26 @@ async function handleStreakCommand(message, client, targetId) {
     const expiresAt = new Date(existingPair.pendingInvite.expiresAt).getTime();
 
     if (expiresAt > Date.now()) {
-      await message.reply(
-        `${targetMember}, invitation streak dari ${message.author} masih pending. Balas pesan invite sebelumnya atau mention balik untuk menerima.`
-      );
+      const previousPendingMessage = await fetchPendingInviteMessage(message.guild, existingPair.pendingInvite);
+
+      if (previousPendingMessage?.id !== message.id) {
+        await clearPendingInviteReaction(previousPendingMessage, client);
+      }
+
+      upsertPair(message.guild.id, message.author.id, targetId, (current) => ({
+        ...current,
+        pendingInvite: {
+          ...(current.pendingInvite || {}),
+          requesterId: message.author.id,
+          targetId,
+          channelId: message.channel.id,
+          messageId: message.id,
+          createdAt: new Date().toISOString(),
+          expiresAt: new Date(Date.now() + (24 * 60 * 60 * 1000)).toISOString()
+        }
+      }));
+
+      await addPendingInviteReaction(message);
       return true;
     }
   }
@@ -503,12 +567,7 @@ async function handleStreakCommand(message, client, targetId) {
     pendingInvite
   }));
 
-  await message.reply(
-    [
-      `${targetMember}, ${message.author} ngajak kamu bikin streak.`,
-      "Balas pesan ini atau mention balik user yang ngajak dalam 24 jam untuk menerima."
-    ].join("\n")
-  );
+  await addPendingInviteReaction(message);
 
   return true;
 }
@@ -658,6 +717,7 @@ module.exports = {
   resolveMemberFromId,
   resolveStreakTierFromValue,
   sendStreakNotification,
+  sendStreakNotificationToChannel,
   sendStreakInfo,
   setStreakChannel,
   setStreakValue
