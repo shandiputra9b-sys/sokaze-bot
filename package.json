@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
-    "generate:streak-emojis": "node scripts/generateStreakEmojis.js"
+    "generate:streak-emojis": "node scripts/generateStreakEmojis.js",
+    "generate:temp-voice-emojis": "node scripts/generateTempVoiceEmojis.js",
+    "generate:temp-voice-panel": "node scripts/generateTempVoicePanel.js"
   },
   "keywords": [
     "discord",

@@ -5,6 +5,7 @@ const {
 } = require("../modules/leaderboards/leaderboardSystem");
 const { refreshAllMusicBoards } = require("../modules/music/musicBoardSystem");
 const { startStreakTopBoardScheduler } = require("../modules/streak/streakSystem");
+const { bootstrapTempVoiceRooms } = require("../modules/temp-voice/tempVoiceSystem");
 
 module.exports = {
   name: "clientReady",
@@ -38,6 +39,10 @@ module.exports = {
 
     await bootstrapVoiceSessions(client).catch((error) => {
       console.error("Failed to bootstrap voice sessions:", error);
+    });
+
+    await bootstrapTempVoiceRooms(client).catch((error) => {
+      console.error("Failed to bootstrap temp voice rooms:", error);
     });
 
     startStreakTopBoardScheduler(client);

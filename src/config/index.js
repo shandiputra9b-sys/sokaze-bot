@@ -50,6 +50,12 @@ const config = {
     chatChannelId: process.env.CHAT_TRACKER_CHANNEL_ID || "1482505425973936180",
     temporaryResponseSeconds: Number.parseInt(process.env.LEADERBOARD_TEMP_RESPONSE_SECONDS || "90", 10)
   },
+  tempVoice: {
+    creatorChannelId: process.env.TEMP_VOICE_CREATOR_CHANNEL_ID || "",
+    panelChannelId: process.env.TEMP_VOICE_PANEL_CHANNEL_ID || "",
+    categoryId: process.env.TEMP_VOICE_CATEGORY_ID || "",
+    temporaryResponseSeconds: Number.parseInt(process.env.TEMP_VOICE_TEMP_RESPONSE_SECONDS || "90", 10)
+  },
   nameRequests: {
     panelChannelId: process.env.NAME_REQUEST_PANEL_CHANNEL_ID || "",
     reviewChannelId: process.env.NAME_REQUEST_REVIEW_CHANNEL_ID || "",

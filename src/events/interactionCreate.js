@@ -39,6 +39,11 @@ const {
 const {
   isCommandBlockedInGeneralChannel
 } = require("../modules/leaderboards/leaderboardSystem");
+const {
+  handleTempVoiceButton,
+  handleTempVoiceModalSubmit,
+  handleTempVoiceSelectMenu
+} = require("../modules/temp-voice/tempVoiceSystem");
 
 module.exports = {
   name: "interactionCreate",
@@ -80,6 +85,10 @@ module.exports = {
     }
 
     if (interaction.isStringSelectMenu()) {
+      if (await handleTempVoiceSelectMenu(interaction, client)) {
+        return;
+      }
+
       if (await handleRolePanelSelect(interaction, client)) {
         return;
       }
@@ -88,6 +97,10 @@ module.exports = {
     }
 
     if (interaction.isButton()) {
+      if (await handleTempVoiceButton(interaction, client)) {
+        return;
+      }
+
       if (await handleModerationButton(interaction, client)) {
         return;
       }
@@ -177,6 +190,10 @@ module.exports = {
     }
 
     if (await handleModerationModalSubmit(interaction, client)) {
+      return;
+    }
+
+    if (await handleTempVoiceModalSubmit(interaction, client)) {
       return;
     }
 

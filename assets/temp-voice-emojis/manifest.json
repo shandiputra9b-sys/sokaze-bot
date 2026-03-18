@@ -1,0 +1,96 @@
+{
+  "generatedAt": "2026-03-18T14:11:06.409Z",
+  "note": "Upload these PNG files as Discord custom emoji for the Temp Voice icon-only control panel.",
+  "icons": [
+    {
+      "key": "name",
+      "label": "NAME",
+      "suggestedEmojiName": "tv_name",
+      "file": "name.png"
+    },
+    {
+      "key": "limit",
+      "label": "LIMIT",
+      "suggestedEmojiName": "tv_limit",
+      "file": "limit.png"
+    },
+    {
+      "key": "privacy",
+      "label": "PRIVACY",
+      "suggestedEmojiName": "tv_privacy",
+      "file": "privacy.png"
+    },
+    {
+      "key": "waiting",
+      "label": "WAITING R.",
+      "suggestedEmojiName": "tv_waiting",
+      "file": "waiting.png"
+    },
+    {
+      "key": "chat",
+      "label": "CHAT",
+      "suggestedEmojiName": "tv_chat",
+      "file": "chat.png"
+    },
+    {
+      "key": "trust",
+      "label": "TRUST",
+      "suggestedEmojiName": "tv_trust",
+      "file": "trust.png"
+    },
+    {
+      "key": "untrust",
+      "label": "UNTRUST",
+      "suggestedEmojiName": "tv_untrust",
+      "file": "untrust.png"
+    },
+    {
+      "key": "invite",
+      "label": "INVITE",
+      "suggestedEmojiName": "tv_invite",
+      "file": "invite.png"
+    },
+    {
+      "key": "kick",
+      "label": "KICK",
+      "suggestedEmojiName": "tv_kick",
+      "file": "kick.png"
+    },
+    {
+      "key": "region",
+      "label": "REGION",
+      "suggestedEmojiName": "tv_region",
+      "file": "region.png"
+    },
+    {
+      "key": "block",
+      "label": "BLOCK",
+      "suggestedEmojiName": "tv_block",
+      "file": "block.png"
+    },
+    {
+      "key": "unblock",
+      "label": "UNBLOCK",
+      "suggestedEmojiName": "tv_unblock",
+      "file": "unblock.png"
+    },
+    {
+      "key": "claim",
+      "label": "CLAIM",
+      "suggestedEmojiName": "tv_claim",
+      "file": "claim.png"
+    },
+    {
+      "key": "transfer",
+      "label": "TRANSFER",
+      "suggestedEmojiName": "tv_transfer",
+      "file": "transfer.png"
+    },
+    {
+      "key": "delete",
+      "label": "DELETE",
+      "suggestedEmojiName": "tv_delete",
+      "file": "delete.png"
+    }
+  ]
+}

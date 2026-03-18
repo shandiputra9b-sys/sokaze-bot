@@ -15,6 +15,40 @@ function resolveTextChannel(message, value) {
   return channel;
 }
 
+function resolveVoiceChannel(message, value) {
+  if (!value) {
+    return message.member?.voice?.channel?.type === ChannelType.GuildVoice
+      ? message.member.voice.channel
+      : null;
+  }
+
+  const normalized = value.replace(/[<#>]/g, "");
+  const channel = message.guild.channels.cache.get(normalized);
+
+  if (!channel || channel.type !== ChannelType.GuildVoice) {
+    return null;
+  }
+
+  return channel;
+}
+
+function resolveCategoryChannel(message, value) {
+  if (!value) {
+    return message.channel.parent?.type === ChannelType.GuildCategory ? message.channel.parent : null;
+  }
+
+  const normalized = value.replace(/[<#>]/g, "");
+  const channel = message.guild.channels.cache.get(normalized);
+
+  if (!channel || channel.type !== ChannelType.GuildCategory) {
+    return null;
+  }
+
+  return channel;
+}
+
 module.exports = {
-  resolveTextChannel
+  resolveCategoryChannel,
+  resolveTextChannel,
+  resolveVoiceChannel
 };
