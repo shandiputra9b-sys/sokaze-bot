@@ -9,7 +9,7 @@ const {
   TextInputStyle
 } = require("discord.js");
 const { createIdCardCard } = require("./idCardCard");
-const { getIdCard, upsertIdCard } = require("../../services/idCardStore");
+const { upsertIdCard } = require("../../services/idCardStore");
 const { getGuildSettings, updateGuildSettings } = require("../../services/guildConfigService");
 
 const ID_CARD_CREATE_BUTTON_ID = "idcard:create";
@@ -24,18 +24,6 @@ const DEFAULT_ID_CARD_PANEL_SETTINGS = {
   cooldownSeconds: 30
 };
 const idCardPanelRefreshLocks = new Map();
-
-function getStoredCard(interactionOrGuildId, userId) {
-  const guildId = typeof interactionOrGuildId === "string"
-    ? interactionOrGuildId
-    : interactionOrGuildId.guildId;
-
-  if (!guildId || !userId) {
-    return null;
-  }
-
-  return getIdCard(guildId, userId);
-}
 
 function getIdCardPanelSettings(guildId) {
   const settings = getGuildSettings(guildId, {
@@ -158,12 +146,12 @@ function countWords(value) {
     .length;
 }
 
-function hasIdCardLimit(member, guildId, userId) {
-  if (!member || !guildId || !userId) {
+function hasIdCardLimit(member) {
+  if (!member) {
     return false;
   }
 
-  return member.roles.cache.has(ID_CARD_REWARD_ROLE_ID) || Boolean(getIdCard(guildId, userId));
+  return member.roles.cache.has(ID_CARD_REWARD_ROLE_ID);
 }
 
 async function grantIdCardRole(member) {
@@ -328,7 +316,7 @@ async function handleIdCardButton(interaction) {
     return true;
   }
 
-  if (hasIdCardLimit(member, interaction.guildId, interaction.user.id)) {
+  if (hasIdCardLimit(member)) {
     await interaction.reply({
       content: "Kamu sudah punya ID card. Satu user hanya bisa punya satu ID card.",
       ephemeral: true
@@ -363,7 +351,7 @@ async function handleIdCardModalSubmit(interaction) {
     return true;
   }
 
-  if (hasIdCardLimit(member, interaction.guildId, interaction.user.id)) {
+  if (hasIdCardLimit(member)) {
     await interaction.reply({
       content: "Kamu sudah punya ID card. Satu user hanya bisa punya satu ID card.",
       ephemeral: true
