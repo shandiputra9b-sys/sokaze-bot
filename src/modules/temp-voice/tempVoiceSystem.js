@@ -382,13 +382,44 @@ async function placeChannelAboveAnchor(guild, voiceChannel, anchorChannel) {
     return false;
   }
 
+  const siblingChannels = [...guild.channels.cache.values()]
+    .filter((channel) =>
+      channel.parentId === anchorChannel.parentId
+      && channel.type === anchorChannel.type
+    )
+    .sort((left, right) => left.rawPosition - right.rawPosition);
+
+  const availablePositions = siblingChannels
+    .map((channel) => channel.rawPosition)
+    .sort((left, right) => left - right);
+
+  const reordered = [];
+  let inserted = false;
+
+  for (const channel of siblingChannels) {
+    if (channel.id === voiceChannel.id) {
+      continue;
+    }
+
+    if (channel.id === anchorChannel.id && !inserted) {
+      reordered.push(voiceChannel);
+      inserted = true;
+    }
+
+    reordered.push(channel);
+  }
+
+  if (!inserted) {
+    reordered.push(voiceChannel);
+  }
+
   if (typeof guild.channels?.setPositions === "function") {
-    await guild.channels.setPositions([
-      {
-        channel: voiceChannel.id,
-        position: anchorChannel.rawPosition
-      }
-    ]).catch(() => null);
+    const updates = reordered.map((channel, index) => ({
+      channel: channel.id,
+      position: availablePositions[index] ?? channel.rawPosition
+    }));
+
+    await guild.channels.setPositions(updates).catch(() => null);
     return true;
   }
 
