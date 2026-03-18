@@ -41,11 +41,11 @@ const TIER_COLORS = {
   mythic: "#ec4899"
 };
 const GENERAL_STREAK_LINES = [
-  "streak kalian sudah {count} hari, pertahankan terus ya.",
-  "api kalian sudah nyala {count} hari, jangan sampai padam.",
-  "{count} hari bareng itu keren, lanjut terus.",
-  "streak {count} hari sudah nyala, jaga ritmenya terus.",
-  "{count} hari bersama, semoga makin konsisten tiap hari."
+  "udah bareng {count} streak nonstop! Kalian luar biasa!",
+  "{count} hari nyala terus, jangan padam ya!",
+  "streak {count} hari sudah jalan, pertahankan terus!",
+  "udah {count} hari bareng, lanjut terus ya!",
+  "{count} hari nonstop itu keren banget, jaga apinya!"
 ];
 const MILESTONE_STREAK_LINES = {
   1: [
@@ -256,41 +256,24 @@ function getGuildIconUrl(guild) {
   }) || null;
 }
 
-function buildStreakNotificationEmbed(channel, pair, leftMember, rightMember, tier, tierEmoji, attachmentName) {
+function formatNotificationMeta(timezone) {
+  const now = new Date();
+  const formatted = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(now);
+
+  return `Today at ${formatted}`;
+}
+
+function buildStreakNotificationEmbed(channel, pair, attachmentName, timezone) {
   const embed = new EmbedBuilder()
-    .setColor(getTierColor(tier))
-    .setAuthor({
-      name: "Sokaze Streak Update",
-      iconURL: getGuildIconUrl(channel.guild) || undefined
-    })
-    .setTitle("Streak Notification")
-    .addFields(
-      {
-        name: "Partner",
-        value: `${leftMember} x ${rightMember}`,
-        inline: false
-      },
-      {
-        name: "Total Streak",
-        value: `**${pair.currentStreak}** ${tierEmoji}`,
-        inline: true
-      },
-      {
-        name: "Tier",
-        value: `**${tier.label}**`,
-        inline: true
-      },
-      {
-        name: "Tanggal",
-        value: `<t:${Math.floor(Date.now() / 1000)}:F>`,
-        inline: false
-      }
-    )
+    .setColor("#f97316")
     .setFooter({
-      text: "Sokaze Assistant",
+      text: `🔥 Total Streak: ${pair.currentStreak} • ${formatNotificationMeta(timezone)}`,
       iconURL: getGuildIconUrl(channel.guild) || undefined
-    })
-    .setTimestamp();
+    });
 
   if (attachmentName) {
     embed.setImage(`attachment://${attachmentName}`);
@@ -471,7 +454,6 @@ async function sendStreakNotificationToChannel(channel, pair) {
   }
 
   const tier = getStreakTier(Math.max(pair.currentStreak, 1));
-  const tierEmoji = (await resolveTierEmoji(destinationChannel.guild, pair))?.toString() || "🔥";
   const card = await createStreakNotificationCard({
     leftUser: leftMember.user,
     rightUser: rightMember.user,
@@ -483,15 +465,12 @@ async function sendStreakNotificationToChannel(channel, pair) {
   });
 
   const dateKey = getTodayDateKey(settings.timezone);
-  const content = `${leftMember} ${rightMember} ${pickStreakLine(pair, dateKey)}`;
+  const content = `🔥 ${leftMember} & ${rightMember}, ${pickStreakLine(pair, dateKey)}`;
   const embed = buildStreakNotificationEmbed(
     destinationChannel,
     pair,
-    leftMember,
-    rightMember,
-    tier,
-    tierEmoji,
-    card?.name
+    card?.name,
+    settings.timezone
   );
   const payload = card
     ? { content, embeds: [embed], files: [card] }
