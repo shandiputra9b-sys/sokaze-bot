@@ -5,7 +5,7 @@ const {
   timeoutMember,
   validateTargetMember
 } = require("./moderationSystem");
-const { normalizeReasonFromArgs, replyWithError } = require("./commandHelpers");
+const { normalizeReasonFromArgs, replyWithActionText, replyWithError } = require("./commandHelpers");
 
 module.exports = {
   name: "timeout",
@@ -43,10 +43,16 @@ module.exports = {
       return;
     }
 
-    const result = await timeoutMember(targetMember, message.author, durationMs, normalizeReasonFromArgs(args, 2), client);
+    const reason = normalizeReasonFromArgs(args, 2);
+    const result = await timeoutMember(targetMember, message.author, durationMs, reason, client);
 
-    await message.reply({
-      embeds: [result.embed]
-    });
+    await replyWithActionText(
+      message,
+      [
+        `${targetMember} telah di-timeout selama \`${args[1]}\`.`,
+        `Alasan: ${reason}`,
+        `Case: #${result.caseEntry.id}`
+      ].join("\n")
+    );
   }
 };

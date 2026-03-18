@@ -1,5 +1,5 @@
 const { ensureActionPermission, unbanUser } = require("./moderationSystem");
-const { normalizeReasonFromArgs, replyWithError } = require("./commandHelpers");
+const { normalizeReasonFromArgs, replyWithActionText, replyWithError } = require("./commandHelpers");
 
 module.exports = {
   name: "unban",
@@ -19,15 +19,21 @@ module.exports = {
       return;
     }
 
-    const result = await unbanUser(message.guild, args[0], message.author, normalizeReasonFromArgs(args), client);
+    const reason = normalizeReasonFromArgs(args);
+    const result = await unbanUser(message.guild, args[0], message.author, reason, client);
 
     if (!result.ok) {
       await replyWithError(message, result.reason);
       return;
     }
 
-    await message.reply({
-      embeds: [result.embed]
-    });
+    await replyWithActionText(
+      message,
+      [
+        `User \`${result.caseEntry.targetTag}\` telah di-unban.`,
+        `Alasan: ${reason}`,
+        `Case: #${result.caseEntry.id}`
+      ].join("\n")
+    );
   }
 };

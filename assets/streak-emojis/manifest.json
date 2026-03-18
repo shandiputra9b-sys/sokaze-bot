@@ -1,0 +1,69 @@
+{
+  "generatedAt": "2026-03-18T09:09:31.765Z",
+  "note": "Upload these PNG files as Discord custom emoji. The same assets can be reused in the streak notification canvas.",
+  "tiers": [
+    {
+      "key": "ember",
+      "label": "Ember",
+      "range": "1-6",
+      "suggestedEmojiName": "streak_ember",
+      "file": "ember.png"
+    },
+    {
+      "key": "blaze",
+      "label": "Blaze",
+      "range": "7-24",
+      "suggestedEmojiName": "streak_blaze",
+      "file": "blaze.png"
+    },
+    {
+      "key": "flare",
+      "label": "Flare",
+      "range": "25-49",
+      "suggestedEmojiName": "streak_flare",
+      "file": "flare.png"
+    },
+    {
+      "key": "goldfire",
+      "label": "Goldfire",
+      "range": "50-99",
+      "suggestedEmojiName": "streak_goldfire",
+      "file": "goldfire.png"
+    },
+    {
+      "key": "bluefire",
+      "label": "Bluefire",
+      "range": "100-149",
+      "suggestedEmojiName": "streak_bluefire",
+      "file": "bluefire.png"
+    },
+    {
+      "key": "sapphire",
+      "label": "Sapphire",
+      "range": "150-249",
+      "suggestedEmojiName": "streak_sapphire",
+      "file": "sapphire.png"
+    },
+    {
+      "key": "soulfire",
+      "label": "Soulfire",
+      "range": "250-364",
+      "suggestedEmojiName": "streak_soulfire",
+      "file": "soulfire.png"
+    },
+    {
+      "key": "eternal",
+      "label": "Eternal",
+      "range": "365-499",
+      "suggestedEmojiName": "streak_eternal",
+      "file": "eternal.png"
+    },
+    {
+      "key": "mythic",
+      "label": "Mythic",
+      "range": "500+",
+      "suggestedEmojiName": "streak_mythic",
+      "file": "mythic.png"
+    }
+  ]
+}

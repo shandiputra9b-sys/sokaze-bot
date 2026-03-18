@@ -4,7 +4,7 @@ const {
   resolveMemberFromMessage,
   validateTargetMember
 } = require("./moderationSystem");
-const { normalizeReasonFromArgs, replyWithError } = require("./commandHelpers");
+const { normalizeReasonFromArgs, replyWithActionText, replyWithError } = require("./commandHelpers");
 
 module.exports = {
   name: "kick",
@@ -33,10 +33,16 @@ module.exports = {
       return;
     }
 
-    const result = await kickMember(targetMember, message.author, normalizeReasonFromArgs(args), client);
+    const reason = normalizeReasonFromArgs(args);
+    const result = await kickMember(targetMember, message.author, reason, client);
 
-    await message.reply({
-      embeds: [result.embed]
-    });
+    await replyWithActionText(
+      message,
+      [
+        `<@${result.caseEntry.targetId}> telah di-kick.`,
+        `Alasan: ${reason}`,
+        `Case: #${result.caseEntry.id}`
+      ].join("\n")
+    );
   }
 };

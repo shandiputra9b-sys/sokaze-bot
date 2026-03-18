@@ -4,7 +4,7 @@ const {
   resolveMemberFromMessage,
   validateTargetMember
 } = require("./moderationSystem");
-const { normalizeReasonFromArgs, replyWithError } = require("./commandHelpers");
+const { normalizeReasonFromArgs, replyWithActionText, replyWithError } = require("./commandHelpers");
 
 module.exports = {
   name: "untimeout",
@@ -34,10 +34,16 @@ module.exports = {
       return;
     }
 
-    const result = await removeTimeout(targetMember, message.author, normalizeReasonFromArgs(args), client);
+    const reason = normalizeReasonFromArgs(args);
+    const result = await removeTimeout(targetMember, message.author, reason, client);
 
-    await message.reply({
-      embeds: [result.embed]
-    });
+    await replyWithActionText(
+      message,
+      [
+        `Timeout milik ${targetMember} telah dicabut.`,
+        `Alasan: ${reason}`,
+        `Case: #${result.caseEntry.id}`
+      ].join("\n")
+    );
   }
 };

@@ -48,7 +48,7 @@ function buildTicketPanel(client, guildId) {
     "- \uD83D\uDC69 Verifikasi Girl wajib siap ditemani admin perempuan",
     "- \uD83D\uDEAB Dilarang membuat laporan palsu",
     "- \uD83D\uDD15 Dilarang tag role yang diinginkan",
-    "- \uD83D\uDCDD Contoh yang dilarang: `@Warga`",
+    "- \uD83D\uDCDD Contoh yang dilarang: <@&1482710348380373123>",
     "- \u23F3 Dilarang spam loket sebelum `2x24 jam`",
     "- \uD83D\uDDF4 Tiket akan ditutup dalam `6 jam` tanpa balasan",
     "",

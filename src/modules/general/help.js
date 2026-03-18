@@ -1,22 +1,32 @@
 const CATEGORY_META = {
   general: {
     label: "General",
-    emoji: "✨",
+    marker: "[*]",
     description: "Command umum untuk penggunaan harian bot."
   },
   moderation: {
     label: "Moderation",
-    emoji: "🛡️",
+    marker: "[MOD]",
     description: "Command untuk warn, timeout, kick, ban, dan panel moderasi."
+  },
+  streak: {
+    label: "Streak",
+    marker: "[STR]",
+    description: "Command untuk melihat info streak dan fitur pasangan streak."
+  },
+  automod: {
+    label: "Automod",
+    marker: "[AUTO]",
+    description: "Command untuk menyiapkan dan menyalakan rule automod."
   },
   admin: {
     label: "Admin",
-    emoji: "⚙️",
+    marker: "[ADM]",
     description: "Command setup dan konfigurasi server."
   },
   tickets: {
     label: "Tickets",
-    emoji: "🎫",
+    marker: "[TIX]",
     description: "Command panel dan template layanan ticket."
   }
 };
@@ -26,7 +36,7 @@ const MAX_MESSAGE_LENGTH = 1900;
 function getCategoryMeta(category) {
   return CATEGORY_META[category] || {
     label: category.charAt(0).toUpperCase() + category.slice(1),
-    emoji: "📁",
+    marker: "[CAT]",
     description: "Kategori command."
   };
 }
@@ -89,7 +99,7 @@ function buildIndexText(client, grouped) {
 
   for (const [category, commands] of [...grouped.entries()].sort(([left], [right]) => left.localeCompare(right))) {
     const meta = getCategoryMeta(category);
-    lines.push(`${meta.emoji} ${meta.label} (\`${category}\`)`);
+    lines.push(`${meta.marker} ${meta.label} (\`${category}\`)`);
     lines.push(`- ${meta.description}`);
     lines.push(`- Jumlah command: ${commands.length}`);
     lines.push(`- Lihat detail: \`${client.config.prefix}help ${category}\``);
@@ -110,7 +120,7 @@ function buildCategoryChunks(client, category, commands) {
   const chunks = [];
   let part = 1;
   let current = [
-    `${meta.emoji} ${meta.label} Commands`,
+    `${meta.marker} ${meta.label} Commands`,
     meta.description,
     "",
     `Gunakan \`${client.config.prefix}help\` untuk lihat kategori lain.`
@@ -127,7 +137,7 @@ function buildCategoryChunks(client, category, commands) {
     chunks.push(current);
     part += 1;
     current = [
-      `${meta.emoji} ${meta.label} Commands (Lanjutan ${part})`,
+      `${meta.marker} ${meta.label} Commands (Lanjutan ${part})`,
       meta.description,
       "",
       block

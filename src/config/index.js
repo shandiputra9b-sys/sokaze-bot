@@ -36,6 +36,10 @@ const config = {
     channelId: process.env.COUNTING_CHANNEL_ID || "",
     startNumber: Number.parseInt(process.env.COUNTING_START_NUMBER || "1", 10)
   },
+  streak: {
+    channelId: process.env.STREAK_CHANNEL_ID || "",
+    timezone: process.env.STREAK_TIMEZONE || "Asia/Jakarta"
+  },
   nameRequests: {
     panelChannelId: process.env.NAME_REQUEST_PANEL_CHANNEL_ID || "",
     reviewChannelId: process.env.NAME_REQUEST_REVIEW_CHANNEL_ID || "",

@@ -4,7 +4,7 @@ const {
   resolveMemberFromMessage,
   validateTargetMember
 } = require("./moderationSystem");
-const { normalizeReasonFromArgs, replyWithError } = require("./commandHelpers");
+const { normalizeReasonFromArgs, replyWithActionText, replyWithError } = require("./commandHelpers");
 
 module.exports = {
   name: "ban",
@@ -33,10 +33,16 @@ module.exports = {
       return;
     }
 
-    const result = await banMember(targetMember, message.author, normalizeReasonFromArgs(args), client);
+    const reason = normalizeReasonFromArgs(args);
+    const result = await banMember(targetMember, message.author, reason, client);
 
-    await message.reply({
-      embeds: [result.embed]
-    });
+    await replyWithActionText(
+      message,
+      [
+        `<@${result.caseEntry.targetId}> telah di-ban.`,
+        `Alasan: ${reason}`,
+        `Case: #${result.caseEntry.id}`
+      ].join("\n")
+    );
   }
 };

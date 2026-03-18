@@ -1,5 +1,7 @@
 const { parsePrefixedCommand } = require("../utils/commandContext");
+const { handleAutomodMessage } = require("../modules/automod/automodSystem");
 const { handleCountingMessage } = require("../modules/counting/countingSystem");
+const { handleStreakMessage } = require("../modules/streak/streakSystem");
 
 module.exports = {
   name: "messageCreate",
@@ -8,7 +10,21 @@ module.exports = {
       return;
     }
 
+    const automodHandled = await handleAutomodMessage(message);
+
+    if (automodHandled) {
+      return;
+    }
+
     const context = parsePrefixedCommand(message.content, client.config.prefix);
+
+    const streakHandled = await handleStreakMessage(message, client, {
+      hasPrefixedCommand: Boolean(context)
+    });
+
+    if (streakHandled) {
+      return;
+    }
 
     if (!context) {
       await handleCountingMessage(message, client);

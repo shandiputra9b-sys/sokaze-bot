@@ -4,7 +4,7 @@ const {
   resolveMemberFromMessage,
   validateTargetMember
 } = require("./moderationSystem");
-const { normalizeReasonFromArgs, replyWithError } = require("./commandHelpers");
+const { normalizeReasonFromArgs, replyWithActionText, replyWithError } = require("./commandHelpers");
 
 module.exports = {
   name: "clearwarnings",
@@ -34,15 +34,22 @@ module.exports = {
       return;
     }
 
-    const result = await clearWarnings(targetMember, message.author, normalizeReasonFromArgs(args), client);
+    const reason = normalizeReasonFromArgs(args);
+    const result = await clearWarnings(targetMember, message.author, reason, client);
 
     if (!result.ok) {
       await replyWithError(message, result.reason);
       return;
     }
 
-    await message.reply({
-      embeds: [result.embed]
-    });
+    await replyWithActionText(
+      message,
+      [
+        `Semua warning aktif milik ${targetMember} telah dibersihkan.`,
+        `Jumlah yang dibersihkan: ${result.caseEntry.count || 0}`,
+        `Alasan: ${reason}`,
+        `Case: #${result.caseEntry.id}`
+      ].join("\n")
+    );
   }
 };

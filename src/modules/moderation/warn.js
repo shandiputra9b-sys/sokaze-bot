@@ -1,10 +1,11 @@
 const {
   ensureActionPermission,
+  getActiveWarnings,
   resolveMemberFromMessage,
   validateTargetMember,
   warnMember
 } = require("./moderationSystem");
-const { normalizeReasonFromArgs, replyWithError } = require("./commandHelpers");
+const { normalizeReasonFromArgs, replyWithActionText, replyWithError } = require("./commandHelpers");
 
 module.exports = {
   name: "warn",
@@ -33,10 +34,18 @@ module.exports = {
       return;
     }
 
-    const result = await warnMember(targetMember, message.author, normalizeReasonFromArgs(args), client);
+    const reason = normalizeReasonFromArgs(args);
+    const result = await warnMember(targetMember, message.author, reason, client);
+    const activeWarnings = getActiveWarnings(message.guild.id, targetMember.id).length;
 
-    await message.reply({
-      embeds: [result.embed]
-    });
+    await replyWithActionText(
+      message,
+      [
+        `${targetMember} telah diberi warning.`,
+        `Alasan: ${reason}`,
+        `Case: #${result.caseEntry.id}`,
+        `Warning aktif: ${activeWarnings}`
+      ].join("\n")
+    );
   }
 };

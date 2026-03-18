@@ -6,6 +6,7 @@ function getEffectiveGuildSettings(guildId, client) {
     tickets: client.config.tickets,
     confessions: client.config.confessions,
     counting: client.config.counting,
+    streak: client.config.streak,
     nameRequests: client.config.nameRequests
   });
 }

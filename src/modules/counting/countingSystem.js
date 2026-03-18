@@ -26,7 +26,11 @@ async function handleCountingMessage(message, client) {
   });
   const expectedNumber = state.currentNumber + 1;
 
-  if (postedNumber === null || message.author.id === state.lastUserId || postedNumber !== expectedNumber) {
+  if (postedNumber === null) {
+    return false;
+  }
+
+  if (message.author.id === state.lastUserId || postedNumber !== expectedNumber) {
     await message.react("❌").catch(() => null);
 
     const resetState = resetCountingState(message.guild.id, counting.startNumber);

@@ -29,8 +29,13 @@ async function replyWithSuccess(message, text) {
   });
 }
 
+async function replyWithActionText(message, text) {
+  await message.reply(text);
+}
+
 module.exports = {
   normalizeReasonFromArgs,
   replyWithError,
+  replyWithActionText,
   replyWithSuccess
 };
