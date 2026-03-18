@@ -9,6 +9,7 @@ const {
 const { createStreakNotificationCard } = require("./streakCard");
 const { createStreakInfoCard } = require("./streakInfoCard");
 const { createStreakTopBoardCard } = require("./streakTopBoardCard");
+const streakTopBoardRefreshes = new Map();
 const PENDING_STREAK_EMOJI = "❓";
 
 const STREAK_TIERS = [
@@ -774,62 +775,73 @@ async function sendStreakInfo(message, client, options = {}) {
 }
 
 async function refreshStreakTopBoardForGuild(guild, client, options = {}) {
-  const settings = getStreakSettings(guild.id, client);
-  const topChannelId = getStreakTopChannelId(settings);
-
-  if (!topChannelId) {
-    return false;
+  if (streakTopBoardRefreshes.has(guild.id)) {
+    return streakTopBoardRefreshes.get(guild.id);
   }
 
-  const todayDateKey = getTodayDateKey(settings.timezone);
-  const force = Boolean(options.force);
+  const refreshPromise = (async () => {
+    const settings = getStreakSettings(guild.id, client);
+    const topChannelId = getStreakTopChannelId(settings);
 
-  const channel = guild.channels.cache.get(topChannelId) || await guild.channels.fetch(topChannelId).catch(() => null);
+    if (!topChannelId) {
+      return false;
+    }
 
-  if (!channel?.isTextBased?.() || !channel.messages) {
-    return false;
-  }
+    const todayDateKey = getTodayDateKey(settings.timezone);
+    const force = Boolean(options.force);
 
-  let boardMessage = null;
+    const channel = guild.channels.cache.get(topChannelId) || await guild.channels.fetch(topChannelId).catch(() => null);
 
-  if (settings.topMessageId) {
-    boardMessage = await channel.messages.fetch(settings.topMessageId).catch(() => null);
-  }
+    if (!channel?.isTextBased?.() || !channel.messages) {
+      return false;
+    }
 
-  if (!force && boardMessage && settings.topLastUpdatedDate === todayDateKey) {
-    return false;
-  }
+    let boardMessage = null;
 
-  const data = await buildStreakTopBoardData(guild, client);
-  const card = await createStreakTopBoardCard(data).catch((error) => {
-    console.error(`Failed to render streak top board for guild ${guild.id}:`, error);
-    return null;
+    if (settings.topMessageId) {
+      boardMessage = await channel.messages.fetch(settings.topMessageId).catch(() => null);
+    }
+
+    if (!force && boardMessage && settings.topLastUpdatedDate === todayDateKey) {
+      return false;
+    }
+
+    const data = await buildStreakTopBoardData(guild, client);
+    const card = await createStreakTopBoardCard(data).catch((error) => {
+      console.error(`Failed to render streak top board for guild ${guild.id}:`, error);
+      return null;
+    });
+
+    const payload = {
+      embeds: [buildStreakTopBoardEmbed(guild, data, card?.name)]
+    };
+
+    if (card) {
+      payload.files = [card];
+    }
+
+    if (boardMessage) {
+      await boardMessage.edit(payload).catch(() => null);
+    } else {
+      boardMessage = await channel.send(payload).catch(() => null);
+    }
+
+    if (!boardMessage) {
+      return false;
+    }
+
+    updateStreakTopBoardState(guild.id, {
+      topMessageId: boardMessage.id,
+      topLastUpdatedDate: todayDateKey
+    });
+
+    return true;
+  })().finally(() => {
+    streakTopBoardRefreshes.delete(guild.id);
   });
 
-  const payload = {
-    embeds: [buildStreakTopBoardEmbed(guild, data, card?.name)]
-  };
-
-  if (card) {
-    payload.files = [card];
-  }
-
-  if (boardMessage) {
-    await boardMessage.edit(payload).catch(() => null);
-  } else {
-    boardMessage = await channel.send(payload).catch(() => null);
-  }
-
-  if (!boardMessage) {
-    return false;
-  }
-
-  updateStreakTopBoardState(guild.id, {
-    topMessageId: boardMessage.id,
-    topLastUpdatedDate: todayDateKey
-  });
-
-  return true;
+  streakTopBoardRefreshes.set(guild.id, refreshPromise);
+  return refreshPromise;
 }
 
 async function refreshAllStreakTopBoards(client, options = {}) {

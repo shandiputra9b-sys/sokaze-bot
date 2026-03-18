@@ -1,6 +1,5 @@
 const { PermissionFlagsBits } = require("discord.js");
 const { refreshLeaderboardHubForGuild, replyWithTemporaryMessage } = require("../leaderboards/leaderboardSystem");
-const { refreshStreakTopBoardForGuild } = require("../streak/streakSystem");
 
 module.exports = {
   name: "refreshleaderboards",
@@ -14,14 +13,15 @@ module.exports = {
       return;
     }
 
-    const [streakRefreshed, boardsRefreshed] = await Promise.all([
-      refreshStreakTopBoardForGuild(message.guild, client, { force: true }).catch(() => false),
-      refreshLeaderboardHubForGuild(message.guild, client, { force: true }).catch(() => false)
-    ]);
+    const boardsRefreshed = await refreshLeaderboardHubForGuild(
+      message.guild,
+      client,
+      { force: true }
+    ).catch(() => false);
 
     await replyWithTemporaryMessage(
       message,
-      streakRefreshed || boardsRefreshed
+      boardsRefreshed
         ? "Panel leaderboard berhasil diperbarui."
         : "Panel leaderboard belum bisa diperbarui. Pastikan channel leaderboard sudah diset.",
       client

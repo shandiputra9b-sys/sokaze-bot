@@ -5,10 +5,7 @@ const {
   replyWithTemporaryMessage,
   setLeaderboardChannel
 } = require("../leaderboards/leaderboardSystem");
-const {
-  refreshStreakTopBoardForGuild,
-  setStreakTopChannel
-} = require("../streak/streakSystem");
+const { setStreakTopChannel } = require("../streak/streakSystem");
 
 module.exports = {
   name: "setleaderboardchannel",
@@ -36,14 +33,15 @@ module.exports = {
     setLeaderboardChannel(message.guild.id, channel.id);
     setStreakTopChannel(message.guild.id, channel.id);
 
-    const [streakRefreshed, leaderboardRefreshed] = await Promise.all([
-      refreshStreakTopBoardForGuild(message.guild, client, { force: true }).catch(() => false),
-      refreshLeaderboardHubForGuild(message.guild, client, { force: true, includeDonator: true }).catch(() => false)
-    ]);
+    const leaderboardRefreshed = await refreshLeaderboardHubForGuild(
+      message.guild,
+      client,
+      { force: true, includeDonator: true }
+    ).catch(() => false);
 
     await replyWithTemporaryMessage(
       message,
-      streakRefreshed || leaderboardRefreshed
+      leaderboardRefreshed
         ? `Leaderboard hub diset ke ${channel} dan panel berhasil diperbarui.`
         : `Leaderboard hub diset ke ${channel}, tapi panel belum sempat dikirim sekarang.`,
       client
