@@ -13,7 +13,7 @@ const {
 } = require("../leaderboards/leaderboardSystem");
 
 const DONATION_MODAL_PREFIX = "donation:modal:";
-const DONATION_PENDING_IMAGE_MS = 30_000;
+const DONATION_PENDING_IMAGE_MS = 2 * 60_000;
 const DONATION_FEED_ROLE_ID = "1482710348380373123";
 const DONATION_HEADER_EMOJI = "<a:emoji_5:1482701058533752943>";
 const DONATION_FOOTER_EMOJI = "<a:emoji_12:1482702863644754021>";
@@ -259,30 +259,33 @@ async function resolveDonationChannel(guild) {
   return isSupportedDonationChannel(channel) ? channel : null;
 }
 
-function buildDonationFeedContent(data) {
-  return [
-    `${DONATION_HEADER_EMOJI} DONATION FEED - SOKAZE`,
-    `<@&${DONATION_FEED_ROLE_ID}>`,
-    DONATION_RECEIVED_LABEL,
-    `${DONATION_DONOR_LABEL} ${data.donorReference}`,
-    `${DONATION_AMOUNT_LABEL} ${formatCurrency(data.amount)}`,
-    `${DONATION_DATE_LABEL} ${data.dateLabel}`,
-    `${DONATION_NOTE_LABEL} ${data.note || "-"}`,
-    "",
-    DONATION_THANKS_LINE,
-    `Kontribusi kalian membantu Sokaze terus berkembang ${DONATION_FOOTER_EMOJI}`
-  ].join("\n");
-}
-
-function buildDonationImageEmbed(guild, imageUrl) {
-  return new EmbedBuilder()
+function buildDonationFeedEmbed(guild, data) {
+  const embed = new EmbedBuilder()
     .setColor(getDonationSettings(guild.id).accentColor)
-    .setImage(imageUrl)
+    .setDescription([
+      `${DONATION_HEADER_EMOJI} **DONATION FEED - SOKAZE**`,
+      "",
+      `<@&${DONATION_FEED_ROLE_ID}>`,
+      DONATION_RECEIVED_LABEL,
+      `${DONATION_DONOR_LABEL} ${data.donorReference}`,
+      `${DONATION_AMOUNT_LABEL} ${formatCurrency(data.amount)}`,
+      `${DONATION_DATE_LABEL} ${data.dateLabel}`,
+      `${DONATION_NOTE_LABEL} ${data.note || "-"}`,
+      "",
+      DONATION_THANKS_LINE,
+      `Kontribusi kalian membantu Sokaze terus berkembang ${DONATION_FOOTER_EMOJI}`
+    ].join("\n"))
     .setFooter({
       text: `${guild.name} - Donation Feed`,
       iconURL: getGuildIconUrl(guild) || undefined
     })
     .setTimestamp();
+
+  if (data.imageUrl) {
+    embed.setImage(data.imageUrl);
+  }
+
+  return embed;
 }
 
 function extractImageAttachment(message) {
@@ -299,7 +302,8 @@ async function waitForDonationImage(channel, userId) {
   if (!channel?.awaitMessages) {
     return {
       status: "unsupported",
-      imageUrl: ""
+      imageUrl: "",
+      sourceMessage: null
     };
   }
 
@@ -325,7 +329,8 @@ async function waitForDonationImage(channel, userId) {
     if (!collectedMessage) {
       return {
         status: "timeout",
-        imageUrl: ""
+        imageUrl: "",
+        sourceMessage: null
       };
     }
 
@@ -334,20 +339,84 @@ async function waitForDonationImage(channel, userId) {
     if (!imageAttachment) {
       return {
         status: "skipped",
-        imageUrl: ""
+        imageUrl: "",
+        sourceMessage: collectedMessage
       };
     }
 
     return {
       status: "image",
-      imageUrl: imageAttachment.url
+      imageUrl: imageAttachment.url,
+      sourceMessage: collectedMessage
     };
   } catch (error) {
     return {
       status: "timeout",
-      imageUrl: ""
+      imageUrl: "",
+      sourceMessage: null
     };
   }
+}
+
+async function collectDonationImageDecision(channel, userId) {
+  const firstAttempt = await waitForDonationImage(channel, userId);
+
+  if (firstAttempt.status !== "timeout") {
+    return firstAttempt;
+  }
+
+  const reminderMessage = await channel.send({
+    content: `<@${userId}> belum ada gambar yang masuk. Kalau masih mau pakai foto, kirim gambar sekarang. Kalau tidak, ketik \`skip\` dalam 2 menit ini ya.`,
+    allowedMentions: {
+      parse: [],
+      users: [userId]
+    }
+  }).catch(() => null);
+
+  const secondAttempt = await waitForDonationImage(channel, userId);
+
+  if (secondAttempt.status === "timeout") {
+    return {
+      status: "final-timeout",
+      imageUrl: "",
+      sourceMessage: null,
+      reminderMessage
+    };
+  }
+
+  return {
+    ...secondAttempt,
+    reminderMessage
+  };
+}
+
+async function cleanupDonationPrompt(result) {
+  if (result?.sourceMessage?.deletable) {
+    await result.sourceMessage.delete().catch(() => null);
+  }
+
+  if (result?.reminderMessage?.deletable) {
+    await result.reminderMessage.delete().catch(() => null);
+  }
+}
+
+async function cleanupDonationPromptAfterTimeout(result) {
+  if (result?.reminderMessage?.deletable) {
+    await result.reminderMessage.delete().catch(() => null);
+  }
+}
+
+async function handleCollectedDonationPrompt(result) {
+  if (["image", "skipped"].includes(result?.status)) {
+    await cleanupDonationPrompt(result);
+    return result;
+  }
+
+  if (result?.status === "final-timeout") {
+    await cleanupDonationPromptAfterTimeout(result);
+  }
+
+  return result;
 }
 
 async function setDonationChannel(interaction) {
@@ -471,40 +540,58 @@ async function handleDonationModalSubmit(interaction, client) {
 
   pendingDonationImages.set(pendingKey, true);
 
-  await interaction.editReply({
-    embeds: [
-      buildSuccessEmbed(
-        "Waiting For Image",
-        [
-          "Kirim 1 gambar di channel ini dalam 30 detik untuk dipasang ke donation feed.",
-          "Kalau tidak mau pakai gambar, ketik `skip`."
-        ].join("\n")
-      )
-    ]
-  }).catch(() => null);
+  let imageWaitResult = {
+    status: "unsupported",
+    imageUrl: "",
+    sourceMessage: null,
+    reminderMessage: null
+  };
+  let sentMessage = null;
 
-  const imageWaitResult = await waitForDonationImage(interaction.channel, interaction.user.id);
-  pendingDonationImages.delete(pendingKey);
+  try {
+    await interaction.editReply({
+      embeds: [
+        buildSuccessEmbed(
+          "Waiting For Image",
+          [
+            "Kirim 1 gambar di channel ini dalam 2 menit untuk dipasang ke donation feed.",
+            "Kalau tidak mau pakai gambar, ketik `skip`.",
+            "Kalau 2 menit pertama lewat, bot akan mention kamu untuk konfirmasi lagi."
+          ].join("\n")
+        )
+      ]
+    }).catch(() => null);
 
-  const sentMessage = await targetChannel.send({
-    content: buildDonationFeedContent({
-      donorReference: donorMember ? `<@${donorMember.id}>` : donorLabel,
-      amount,
-      dateLabel: formatDonationDate(donationDate),
-      note
-    }),
-    embeds: imageWaitResult.imageUrl
-      ? [buildDonationImageEmbed(interaction.guild, imageWaitResult.imageUrl)]
-      : [],
-    allowedMentions: {
-      parse: [],
-      roles: [DONATION_FEED_ROLE_ID],
-      users: donorMember ? [donorMember.id] : []
-    }
-  }).catch((error) => {
-    console.error("Failed to send donation log message:", error);
-    return null;
-  });
+    imageWaitResult = await handleCollectedDonationPrompt(
+      await collectDonationImageDecision(interaction.channel, interaction.user.id)
+    );
+
+    sentMessage = await targetChannel.send({
+      content: [
+        `<@&${DONATION_FEED_ROLE_ID}>`,
+        donorMember ? `<@${donorMember.id}>` : ""
+      ].filter(Boolean).join(" "),
+      embeds: [
+        buildDonationFeedEmbed(interaction.guild, {
+          donorReference: donorMember ? `<@${donorMember.id}>` : donorLabel,
+          amount,
+          dateLabel: formatDonationDate(donationDate),
+          note,
+          imageUrl: imageWaitResult.imageUrl
+        })
+      ],
+      allowedMentions: {
+        parse: [],
+        roles: [DONATION_FEED_ROLE_ID],
+        users: donorMember ? [donorMember.id] : []
+      }
+    }).catch((error) => {
+      console.error("Failed to send donation log message:", error);
+      return null;
+    });
+  } finally {
+    pendingDonationImages.delete(pendingKey);
+  }
 
   if (!sentMessage) {
     await interaction.editReply({
@@ -531,7 +618,9 @@ async function handleDonationModalSubmit(interaction, client) {
   } else if (imageWaitResult.status === "skipped") {
     responseLines.push("Donation feed dikirim tanpa gambar karena kamu memilih `skip`.");
   } else if (imageWaitResult.status === "timeout") {
-    responseLines.push("Donation feed dikirim tanpa gambar karena tidak ada gambar yang masuk dalam 30 detik.");
+    responseLines.push("Donation feed dikirim tanpa gambar setelah timeout awal.");
+  } else if (imageWaitResult.status === "final-timeout") {
+    responseLines.push("Donation feed dikirim tanpa gambar karena setelah pengingat kedua tetap belum ada gambar atau `skip`.");
   } else if (imageWaitResult.status === "unsupported") {
     responseLines.push("Channel ini tidak mendukung penantian gambar, jadi donation feed dikirim tanpa gambar.");
   }
