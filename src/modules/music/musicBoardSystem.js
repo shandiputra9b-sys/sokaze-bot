@@ -8,6 +8,9 @@ const DEFAULT_MUSIC_BOARD_SETTINGS = {
   temporaryResponseSeconds: 90
 };
 
+const AVAILABLE_ICON = "\u{1F7E2}";
+const BUSY_ICON = "\u{1F534}";
+const MUSIC_BOARD_PAGE_SIZE = 5;
 const musicBoardRefreshes = new Map();
 
 function getMusicBoardSettings(guildId) {
@@ -60,33 +63,105 @@ function getGuildIconUrl(guild) {
   }) || null;
 }
 
-function buildMusicBoardEmbed(guild, lines) {
+function chunkEntries(entries, chunkSize) {
+  const chunks = [];
+
+  for (let index = 0; index < entries.length; index += chunkSize) {
+    chunks.push(entries.slice(index, index + chunkSize));
+  }
+
+  return chunks;
+}
+
+function buildBoardEntryLine(entry) {
+  const commandPart = entry.commandHint ? ` \`${entry.commandHint}\`` : "";
+  const statusText = entry.voiceChannel ? entry.voiceChannel.toString() : "Tersedia";
+
+  return `${entry.statusIcon} **${entry.label}**${commandPart}\n${entry.mention} • ${statusText}`;
+}
+
+function buildMusicBoardSummaryEmbed(guild, entries) {
+  const guildIconUrl = getGuildIconUrl(guild) || undefined;
+  const availableCount = entries.filter((entry) => !entry.voiceChannel).length;
+  const busyCount = entries.length - availableCount;
+
   return new EmbedBuilder()
     .setColor("#22c55e")
     .setAuthor({
       name: "Sokaze Music List",
-      iconURL: getGuildIconUrl(guild) || undefined
+      iconURL: guildIconUrl
     })
-    .setDescription(lines.join("\n"))
+    .setDescription([
+      `${AVAILABLE_ICON} **Tersedia:** ${availableCount}`,
+      `${BUSY_ICON} **Sedang Dipakai:** ${busyCount}`,
+      "",
+      "Status akan update otomatis saat music bot masuk, pindah, atau keluar dari voice."
+    ].join("\n"))
     .setFooter({
-      text: "Sokaze Assistant | Auto update saat music bot pindah voice",
-      iconURL: getGuildIconUrl(guild) || undefined
+      text: "Sokaze Assistant | Music board auto update",
+      iconURL: guildIconUrl
     })
     .setTimestamp();
 }
 
-async function buildMusicBoardLines(guild) {
+function buildMusicBoardSectionEmbeds(guild, entries, options) {
+  const guildIconUrl = getGuildIconUrl(guild) || undefined;
+  const chunks = chunkEntries(entries, MUSIC_BOARD_PAGE_SIZE);
+
+  if (chunks.length === 0) {
+    return [
+      new EmbedBuilder()
+        .setColor(options.color)
+        .setAuthor({
+          name: options.title,
+          iconURL: guildIconUrl
+        })
+        .setDescription(options.emptyMessage)
+    ];
+  }
+
+  return chunks.map((chunk, index) => new EmbedBuilder()
+    .setColor(options.color)
+    .setAuthor({
+      name: chunks.length > 1 ? `${options.title} (${index + 1}/${chunks.length})` : options.title,
+      iconURL: guildIconUrl
+    })
+    .setDescription(chunk.map(buildBoardEntryLine).join("\n\n")));
+}
+
+function buildMusicBoardEmbeds(guild, entries) {
+  const availableEntries = entries.filter((entry) => !entry.voiceChannel);
+  const busyEntries = entries.filter((entry) => entry.voiceChannel);
+
+  return [
+    buildMusicBoardSummaryEmbed(guild, entries),
+    ...buildMusicBoardSectionEmbeds(guild, availableEntries, {
+      title: `${AVAILABLE_ICON} Music Bot Tersedia`,
+      color: "#22c55e",
+      emptyMessage: "Semua music bot sedang dipakai sekarang."
+    }),
+    ...buildMusicBoardSectionEmbeds(guild, busyEntries, {
+      title: `${BUSY_ICON} Music Bot Sedang Dipakai`,
+      color: "#ef4444",
+      emptyMessage: "Tidak ada music bot yang sedang dipakai."
+    })
+  ];
+}
+
+async function buildMusicBoardEntries(guild) {
   const members = await Promise.all(MUSIC_BOTS.map((entry) => resolveBotMember(guild, entry.botId)));
 
   return MUSIC_BOTS.map((entry, index) => {
     const member = members[index];
     const voiceChannel = member?.voice?.channel || null;
-    const status = voiceChannel ? "🔴" : "🟢";
-    const commandLabel = entry.commandHint ? ` (${entry.commandHint})` : "";
     const mention = member ? member.toString() : `<@${entry.botId}>`;
-    const location = voiceChannel ? voiceChannel.toString() : "Tidak sedang di voice";
 
-    return `${status} ${entry.label}${commandLabel} - ${mention} - ${location}`;
+    return {
+      ...entry,
+      mention,
+      voiceChannel,
+      statusIcon: voiceChannel ? BUSY_ICON : AVAILABLE_ICON
+    };
   });
 }
 
@@ -115,9 +190,9 @@ async function refreshMusicBoardForGuild(guild, options = {}) {
       boardMessage = await channel.messages.fetch(settings.messageId).catch(() => null);
     }
 
-    const lines = await buildMusicBoardLines(guild);
+    const entries = await buildMusicBoardEntries(guild);
     const payload = {
-      embeds: [buildMusicBoardEmbed(guild, lines)]
+      embeds: buildMusicBoardEmbeds(guild, entries)
     };
 
     if (boardMessage) {
