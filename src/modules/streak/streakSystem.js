@@ -964,6 +964,47 @@ async function completePairStreak(message, pair, options = {}) {
   ]);
 }
 
+async function handleActivePairInteraction(message, client, settings, pair, partnerId, source) {
+  const dateKey = getTodayDateKey(settings.timezone);
+  const dailyState = recordDailyInteraction(
+    pair,
+    message.author.id,
+    source,
+    message.id,
+    dateKey
+  );
+  const alreadyCompletedToday = Boolean(dailyState.completedAt) || pair.lastCompletedDate === dateKey;
+
+  if (alreadyCompletedToday) {
+    upsertPair(message.guild.id, pair.userIds[0], pair.userIds[1], (current) => ({
+      ...current,
+      dailyState
+    }));
+
+    await replyWithTemporaryMessage(message, "Streak hari ini selesai.", client);
+    return true;
+  }
+
+  const partnerInteracted = Boolean(dailyState.participants[partnerId]);
+  const actorAlreadyRecorded = Boolean(dailyState.participants[message.author.id]);
+
+  if (!actorAlreadyRecorded || !partnerInteracted) {
+    upsertPair(message.guild.id, pair.userIds[0], pair.userIds[1], (current) => ({
+      ...current,
+      dailyState
+    }));
+    return false;
+  }
+
+  const completedPair = upsertPair(message.guild.id, pair.userIds[0], pair.userIds[1], (current) =>
+    finalizeDailyCompletion(current, dateKey, message.id, dailyState)
+  );
+
+  await completePairStreak(message, completedPair);
+  await replyWithTemporaryMessage(message, "Streak hari ini selesai.", client);
+  return true;
+}
+
 async function handlePendingAcceptance(message, client, settings, pendingTargetId) {
   const mentionTargetId = getMentionTargetId(message);
   const replyTargetId = await getReplyTargetId(message);
@@ -1066,15 +1107,14 @@ async function handleStreakCommand(message, client, targetId) {
   }
 
   if (existingPair && isActivatedPair(existingPair)) {
-    await replyWithTemporaryMessage(
+    return handleActivePairInteraction(
       message,
-      [
-        `${message.author}, streak kamu dengan ${targetMember}:`,
-        formatStatusLine(existingPair, settings.timezone)
-      ].join("\n"),
-      client
+      client,
+      settings,
+      existingPair,
+      targetId,
+      "command"
     );
-    return true;
   }
 
   const pendingInvite = {
@@ -1127,41 +1167,14 @@ async function handleDailyInteraction(message, client) {
     return false;
   }
 
-  const dateKey = getTodayDateKey(settings.timezone);
-  const dailyState = recordDailyInteraction(
+  return handleActivePairInteraction(
+    message,
+    client,
+    settings,
     pair,
-    message.author.id,
-    replyTargetId ? "reply" : "mention",
-    message.id,
-    dateKey
+    partnerId,
+    replyTargetId ? "reply" : "mention"
   );
-
-  if (dailyState.completedAt) {
-    upsertPair(message.guild.id, pair.userIds[0], pair.userIds[1], (current) => ({
-      ...current,
-      dailyState
-    }));
-    return false;
-  }
-
-  const partnerInteracted = Boolean(dailyState.participants[partnerId]);
-  const actorAlreadyRecorded = Boolean(dailyState.participants[message.author.id]);
-  const sameDayAlreadyCompleted = pair.lastCompletedDate === dateKey;
-
-  if (!actorAlreadyRecorded || sameDayAlreadyCompleted || !partnerInteracted) {
-    upsertPair(message.guild.id, pair.userIds[0], pair.userIds[1], (current) => ({
-      ...current,
-      dailyState
-    }));
-    return false;
-  }
-
-  const completedPair = upsertPair(message.guild.id, pair.userIds[0], pair.userIds[1], (current) =>
-    finalizeDailyCompletion(current, dateKey, message.id, dailyState)
-  );
-
-  await completePairStreak(message, completedPair);
-  return true;
 }
 
 async function handleStreakMessage(message, client, options = {}) {
