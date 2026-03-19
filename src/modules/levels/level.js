@@ -10,6 +10,7 @@ const {
   setLevelRole,
   setLevelThreshold,
   setLevelXpReward,
+  sendLevelUpTestNotification,
   syncLevelRolesForGuild,
   syncManualLevelForMember
 } = require("./levelSystem");
@@ -48,7 +49,7 @@ module.exports = {
   aliases: ["tier"],
   category: "levels",
   description: "Lihat dan atur progression level Sokaze.",
-  usage: "level <status|set|role|roles|sync|announce|threshold|reward|cadence|minlength>",
+  usage: "level <status|set|role|roles|sync|announce|threshold|reward|cadence|minlength|testup>",
   async execute(message, args, client) {
     const action = (args[0] || "status").toLowerCase();
 
@@ -212,6 +213,34 @@ module.exports = {
       return;
     }
 
+    if (action === "testup") {
+      const targetMember = await resolveGuildMember(message.guild, args[1]);
+      const targetLevel = clampLevel(args[2]);
+
+      if (!targetMember || targetMember.user.bot) {
+        await message.reply("Member target tidak valid atau merupakan bot.");
+        return;
+      }
+
+      if (targetLevel <= 1) {
+        await message.reply("Gunakan level target 2 sampai 5 untuk preview level-up.");
+        return;
+      }
+
+      const sent = await sendLevelUpTestNotification(
+        message.guild,
+        targetMember,
+        targetLevel,
+        client,
+        message.channel.id
+      );
+
+      await message.reply(sent
+        ? `Preview level-up untuk ${targetMember} berhasil dikirim ke channel ini.`
+        : "Gagal mengirim preview level-up. Cek permission bot di channel ini.");
+      return;
+    }
+
     await message.reply([
       "Gunakan salah satu ini:",
       "`sk level status [@member]`",
@@ -223,7 +252,8 @@ module.exports = {
       "`sk level threshold <2-5> <xp>`",
       "`sk level reward <chat|voice|streak> <xp>`",
       "`sk level cadence <chat|voice> <menit>`",
-      "`sk level minlength <karakter>`"
+      "`sk level minlength <karakter>`",
+      "`sk level testup @member <2-5>`"
     ].join("\n"));
   }
 };

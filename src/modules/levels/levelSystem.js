@@ -90,6 +90,32 @@ function getLevelMeta(level) {
   return LEVEL_META[clampLevel(level)] || LEVEL_META[LEVEL_MIN];
 }
 
+function buildLevelPreviewInfo(guildId, level, client = null) {
+  const settings = getLevelSettings(guildId, client);
+  const targetLevel = clampLevel(level);
+  const meta = getLevelMeta(targetLevel);
+
+  return {
+    guildId,
+    userId: "",
+    ...meta,
+    xp: getThresholdForLevel(settings, targetLevel),
+    currentThreshold: getThresholdForLevel(settings, targetLevel),
+    nextThreshold: targetLevel >= LEVEL_MAX ? getThresholdForLevel(settings, targetLevel) : getThresholdForLevel(settings, targetLevel + 1),
+    remainingXp: targetLevel >= LEVEL_MAX ? 0 : Math.max(0, getThresholdForLevel(settings, targetLevel + 1) - getThresholdForLevel(settings, targetLevel)),
+    progressRatio: targetLevel >= LEVEL_MAX ? 1 : 0,
+    roleId: settings.roleIds[String(targetLevel)] || "",
+    thresholds: settings.thresholds,
+    xpRewards: settings.xpRewards,
+    announceChannelId: settings.announceChannelId || "",
+    lastDirectRenameAt: "",
+    lastChatXpAt: "",
+    lastVoiceXpAt: "",
+    updatedAt: "",
+    source: "preview"
+  };
+}
+
 function getLevelSettings(guildId, client = null) {
   const settings = getGuildSettings(guildId, {
     levels: client?.config?.levels || DEFAULT_LEVEL_SETTINGS
@@ -693,6 +719,23 @@ async function sendLevelUpNotification(guild, member, previousLevelInfo, nextLev
   return true;
 }
 
+async function sendLevelUpTestNotification(guild, member, targetLevel, client, preferredChannelId = "") {
+  const nextLevel = clampLevel(targetLevel);
+  const previousLevel = Math.max(LEVEL_MIN, nextLevel - 1);
+  const previousLevelInfo = buildLevelPreviewInfo(guild.id, previousLevel, client);
+  const nextLevelInfo = buildLevelPreviewInfo(guild.id, nextLevel, client);
+
+  return sendLevelUpNotification(
+    guild,
+    member,
+    previousLevelInfo,
+    nextLevelInfo,
+    client,
+    preferredChannelId,
+    "manual"
+  );
+}
+
 async function applyXpToMember(member, amount, source, client, options = {}) {
   if (!member || member.user?.bot) {
     return {
@@ -915,6 +958,7 @@ module.exports = {
   awardTrackedChatXp,
   buildLevelRoleStatusEmbed,
   buildLevelStatusEmbed,
+  buildLevelPreviewInfo,
   buildProgressBar,
   clampLevel,
   clearDirectRenameCooldown,
@@ -933,6 +977,7 @@ module.exports = {
   reconcileLevelState,
   resolveLevelFromXp,
   sendLevelUpNotification,
+  sendLevelUpTestNotification,
   setLevelAnnounceChannel,
   setLevelCadence,
   setLevelMinimumChatLength,

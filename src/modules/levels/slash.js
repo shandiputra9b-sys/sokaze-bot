@@ -16,6 +16,7 @@ const {
   setLevelRole,
   setLevelThreshold,
   setLevelXpReward,
+  sendLevelUpTestNotification,
   syncLevelRolesForGuild,
   syncManualLevelForMember
 } = require("./levelSystem");
@@ -184,6 +185,25 @@ const slashData = new SlashCommandBuilder()
           .setMinValue(0)
           .setRequired(true)
       )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("testup")
+      .setDescription("Munculkan preview notifikasi level up")
+      .addUserOption((option) =>
+        option
+          .setName("member")
+          .setDescription("Member target")
+          .setRequired(true)
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName("level")
+          .setDescription("Level target preview 2-5")
+          .setMinValue(2)
+          .setMaxValue(LEVEL_MAX)
+          .setRequired(true)
+      )
   );
 
 module.exports = {
@@ -312,6 +332,36 @@ module.exports = {
         content: member
           ? `Role level untuk ${member} berhasil disinkronkan.`
           : `Sinkronisasi role level selesai untuk ${synced} member.`,
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (subcommand === "testup") {
+      const member = interaction.options.getMember("member")
+        || await interaction.guild.members.fetch(interaction.options.getUser("member", true).id).catch(() => null);
+      const targetLevel = clampLevel(interaction.options.getInteger("level", true));
+
+      if (!member || member.user.bot) {
+        await interaction.reply({
+          content: "Member target tidak valid atau merupakan bot.",
+          ephemeral: true
+        });
+        return;
+      }
+
+      const sent = await sendLevelUpTestNotification(
+        interaction.guild,
+        member,
+        targetLevel,
+        interaction.client,
+        interaction.channelId
+      );
+
+      await interaction.reply({
+        content: sent
+          ? `Preview level-up untuk ${member} berhasil dikirim ke channel ini.`
+          : "Gagal mengirim preview level-up. Cek permission bot di channel ini.",
         ephemeral: true
       });
       return;
