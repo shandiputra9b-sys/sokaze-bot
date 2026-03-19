@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sokaze Embed Builder</title>
+    <link rel="stylesheet" href="/embed-builder.css" />
+  </head>
+  <body>
+    <div id="loginOverlay" class="overlay">
+      <form id="loginForm" class="login-card">
+        <h1>Embed Builder</h1>
+        <p>Masuk dulu untuk membuka panel embed.</p>
+        <label class="stack">
+          <span>Password</span>
+          <input id="passwordInput" type="password" autocomplete="current-password" required />
+        </label>
+        <button type="submit" class="primary-button">Masuk</button>
+        <p id="loginError" class="error-text"></p>
+      </form>
+    </div>
+
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Sokaze</p>
+        <h1>Embed Builder</h1>
+      </div>
+      <div class="topbar-actions">
+        <button id="logoutButton" type="button" class="ghost-button">Logout</button>
+        <button id="sendButton" type="button" class="primary-button">Send to Discord</button>
+      </div>
+    </header>
+
+    <main class="page">
+      <section class="editor-shell">
+        <div class="compact-grid">
+          <label class="stack">
+            <span>Channel</span>
+            <select id="channelSelect"></select>
+          </label>
+
+          <div class="template-row">
+            <label class="stack grow">
+              <span>Template</span>
+              <select id="templateSelect"></select>
+            </label>
+            <button id="loadTemplateButton" type="button" class="ghost-button">Load</button>
+            <button id="deleteTemplateButton" type="button" class="ghost-button danger">Delete</button>
+          </div>
+        </div>
+
+        <section class="card toolbar-card">
+          <div class="toolbar-header">
+            <strong>Formatting</strong>
+            <span id="formatTargetLabel">Fokus: belum ada textarea aktif</span>
+          </div>
+          <div class="toolbar-grid">
+            <button type="button" data-format="bold"><strong>B</strong></button>
+            <button type="button" data-format="italic"><em>I</em></button>
+            <button type="button" data-format="underline"><u>U</u></button>
+            <button type="button" data-format="strike"><s>S</s></button>
+            <button type="button" data-format="spoiler">||</button>
+            <button type="button" data-format="code">`</button>
+            <button type="button" data-format="codeblock">{ }</button>
+            <button type="button" data-format="quote">"</button>
+            <button type="button" data-format="bullet">•</button>
+            <button type="button" data-format="number">1.</button>
+          </div>
+        </section>
+
+        <details class="card" open>
+          <summary>Message</summary>
+          <div class="card-body">
+            <label class="stack">
+              <span>Content</span>
+              <textarea id="messageContent" data-format-target="Message Content" rows="5" placeholder="Teks luar embed"></textarea>
+            </label>
+          </div>
+        </details>
+
+        <details class="card" open>
+          <summary>Embed</summary>
+          <div class="card-body double-grid">
+            <label class="stack">
+              <span>Title</span>
+              <input id="embedTitle" type="text" maxlength="256" />
+            </label>
+            <label class="stack">
+              <span>Color</span>
+              <input id="embedColor" type="color" value="#111214" />
+            </label>
+            <label class="stack full">
+              <span>Description</span>
+              <textarea id="embedDescription" data-format-target="Embed Description" rows="8"></textarea>
+            </label>
+            <label class="stack">
+              <span>Author Name</span>
+              <input id="authorName" type="text" maxlength="256" />
+            </label>
+            <label class="stack">
+              <span>Author Icon URL</span>
+              <input id="authorIconUrl" type="url" placeholder="https://..." />
+            </label>
+            <label class="stack">
+              <span>Author URL</span>
+              <input id="authorUrl" type="url" placeholder="https://..." />
+            </label>
+            <label class="stack">
+              <span>Thumbnail URL</span>
+              <input id="thumbnailUrl" type="url" placeholder="https://..." />
+            </label>
+            <label class="stack full">
+              <span>Image URL</span>
+              <input id="imageUrl" type="url" placeholder="https://..." />
+            </label>
+            <label class="stack">
+              <span>Footer Text</span>
+              <input id="footerText" type="text" maxlength="2048" />
+            </label>
+            <label class="stack">
+              <span>Footer Icon URL</span>
+              <input id="footerIconUrl" type="url" placeholder="https://..." />
+            </label>
+            <label class="inline-check">
+              <input id="timestampToggle" type="checkbox" />
+              <span>Timestamp</span>
+            </label>
+          </div>
+        </details>
+
+        <details class="card" open>
+          <summary>Fields</summary>
+          <div class="card-body">
+            <div id="fieldsContainer" class="builder-list"></div>
+            <button id="addFieldButton" type="button" class="ghost-button">Add Field</button>
+          </div>
+        </details>
+
+        <details class="card">
+          <summary>Link Buttons</summary>
+          <div class="card-body">
+            <div id="buttonsContainer" class="builder-list"></div>
+            <button id="addButtonButton" type="button" class="ghost-button">Add Link Button</button>
+          </div>
+        </details>
+
+        <section class="card template-save-card">
+          <div class="card-body template-save-row">
+            <label class="stack grow">
+              <span>Template Name</span>
+              <input id="templateNameInput" type="text" maxlength="80" placeholder="Nama template" />
+            </label>
+            <button id="saveTemplateButton" type="button" class="primary-button">Save Template</button>
+          </div>
+          <p id="statusText" class="status-text"></p>
+        </section>
+      </section>
+
+      <aside class="preview-shell">
+        <div class="preview-card">
+          <div class="preview-header">
+            <strong>Live Preview</strong>
+            <span>Discord-style</span>
+          </div>
+          <div id="previewRoot" class="discord-preview"></div>
+        </div>
+      </aside>
+    </main>
+
+    <script src="/embed-builder.js"></script>
+  </body>
+</html>

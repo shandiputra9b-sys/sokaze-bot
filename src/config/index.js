@@ -5,6 +5,8 @@ dotenv.config({
   path: path.join(__dirname, "..", "..", ".env")
 });
 
+const embedBuilderPassword = process.env.EMBED_BUILDER_PASSWORD || "";
+
 const config = {
   token: process.env.DISCORD_TOKEN,
   prefix: process.env.PREFIX || "sk",
@@ -56,6 +58,15 @@ const config = {
     categoryId: process.env.TEMP_VOICE_CATEGORY_ID || "",
     anchorChannelId: process.env.TEMP_VOICE_ANCHOR_CHANNEL_ID || "1483842795704680549",
     temporaryResponseSeconds: Number.parseInt(process.env.TEMP_VOICE_TEMP_RESPONSE_SECONDS || "90", 10)
+  },
+  embedBuilder: {
+    enabled: process.env.EMBED_BUILDER_ENABLED
+      ? process.env.EMBED_BUILDER_ENABLED !== "false"
+      : Boolean(embedBuilderPassword),
+    host: process.env.EMBED_BUILDER_HOST || "0.0.0.0",
+    port: Number.parseInt(process.env.EMBED_BUILDER_PORT || "3218", 10),
+    password: embedBuilderPassword,
+    sessionTtlHours: Number.parseInt(process.env.EMBED_BUILDER_SESSION_TTL_HOURS || "12", 10)
   },
   nameRequests: {
     panelChannelId: process.env.NAME_REQUEST_PANEL_CHANNEL_ID || "",
