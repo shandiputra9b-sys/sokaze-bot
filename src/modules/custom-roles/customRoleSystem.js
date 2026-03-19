@@ -230,7 +230,7 @@ function buildCustomRolePanelEmbed(guild) {
     .setDescription(
       [
         "Panel ini khusus untuk member yang punya akses **booster** atau **donatur**.",
-        "Akses temporary dari shop coin juga akan ikut dikenali otomatis.",
+        "Akses temporary dari shop Gazecoin juga akan ikut dikenali otomatis.",
         "",
         "**Aturan:**",
         "- Maksimal 1 custom role per user",
@@ -263,7 +263,7 @@ function buildCustomRoleTicketEmbed(guild, member, state, entitlement) {
     : entitlement.sourceType === "donator"
       ? "Donatur"
       : entitlement.sourceType === "shop"
-        ? "Shop Coin Access"
+        ? "Shop Gazecoin Access"
       : "Tidak aktif";
   const iconStatus = canUseRoleIcons(guild)
     ? "Role icon aktif. Setelah modal, kirim gambar icon di ticket ini."

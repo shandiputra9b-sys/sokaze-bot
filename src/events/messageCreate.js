@@ -9,8 +9,15 @@ const { handleStreakMessage } = require("../modules/streak/streakSystem");
 const { handleStickyMessage } = require("../modules/sticky/stickySystem");
 const { handleIdCardPanelMessage } = require("../modules/idcard/idCardSystem");
 const { handleCustomRoleTicketMessage } = require("../modules/custom-roles/customRoleSystem");
+const {
+  clearAfkFromMessage,
+  isAfkCommandContext,
+  notifyMentionedAfkUsers,
+  parseQuestionAfkCommand
+} = require("../modules/afk/afkSystem");
 const { awardTrackedChatCoins } = require("../modules/shop/shopSystem");
 const { touchPrivateRoomActivity } = require("../modules/private-rooms/privateRoomSystem");
+const { awardTrackedChatXp } = require("../modules/levels/levelSystem");
 
 module.exports = {
   name: "messageCreate",
@@ -20,6 +27,25 @@ module.exports = {
     }
 
     if (message.author.bot) {
+      await handleStickyMessage(message, client);
+      await handleIdCardPanelMessage(message, client);
+      return;
+    }
+
+    const questionAfkContext = parseQuestionAfkCommand(message.content);
+
+    if (questionAfkContext) {
+      const afkCommand = client.commandIndex.get("afk");
+
+      if (afkCommand) {
+        try {
+          await afkCommand.execute(message, questionAfkContext.args, client);
+        } catch (error) {
+          console.error('Failed to execute AFK shortcut command "?afk":', error);
+          await message.reply("Terjadi error saat mengaktifkan status AFK.");
+        }
+      }
+
       await handleStickyMessage(message, client);
       await handleIdCardPanelMessage(message, client);
       return;
@@ -53,11 +79,17 @@ module.exports = {
       return;
     }
 
+    if (!isAfkCommandContext(context)) {
+      await clearAfkFromMessage(message);
+    }
+
     if (!context) {
+      await notifyMentionedAfkUsers(message);
       await touchPrivateRoomActivity(message, client);
       const trackedChat = await trackChatMessage(message, client);
       if (trackedChat) {
         await awardTrackedChatCoins(message, client);
+        await awardTrackedChatXp(message, client);
       }
       await handleCountingMessage(message, client);
       await handleStickyMessage(message, client);

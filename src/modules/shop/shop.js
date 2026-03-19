@@ -1,8 +1,10 @@
 const { buildProfileSnapshot } = require("../profile/profileSystem");
 const {
+  GAZECOIN_NAME,
   buildShopBalanceEmbed,
   buildShopCatalogEmbed,
   ensureShopAccess,
+  getGazecoinDisplay,
   getEconomySummary,
   grantCoinsToMember,
   hasShopAdminPermission,
@@ -15,14 +17,15 @@ module.exports = {
   name: "shop",
   aliases: ["coinshop", "market"],
   category: "levels",
-  description: "Lihat saldo coin dan belanja reward Sokaze.",
+  description: `Lihat saldo ${GAZECOIN_NAME} dan belanja reward Sokaze.`,
   usage: "shop <balance|catalog|buy|grant>",
   async execute(message, args) {
     const action = (args[0] || "catalog").toLowerCase();
 
     if (action === "grant") {
+      const gazecoin = await getGazecoinDisplay(message.client || message.guild.client || null);
       if (!hasShopAdminPermission(message.member)) {
-        await message.reply("Kamu butuh permission Manage Server untuk menambah coin member.");
+        await message.reply(`Kamu butuh permission Manage Server untuk menambah ${GAZECOIN_NAME} member.`);
         return;
       }
 
@@ -36,7 +39,7 @@ module.exports = {
 
       const result = grantCoinsToMember(message.guild.id, targetMember.id, amount);
       await message.reply(result.ok
-        ? `Berhasil menambahkan coin untuk ${targetMember}. Saldo baru: **${result.entry.balance.toLocaleString("id-ID")} coin**.`
+        ? `${gazecoin} Berhasil menambahkan ${GAZECOIN_NAME} untuk ${targetMember}. Saldo baru: **${result.entry.balance.toLocaleString("id-ID")} ${GAZECOIN_NAME}**.`
         : result.reason);
       return;
     }
@@ -50,8 +53,9 @@ module.exports = {
 
     if (action === "catalog") {
       const snapshot = await buildProfileSnapshot(message.guild, message.member);
+      const gazecoin = await getGazecoinDisplay(message.client || message.guild.client || null);
       await message.reply({
-        embeds: [buildShopCatalogEmbed(snapshot)]
+        embeds: [buildShopCatalogEmbed(snapshot, gazecoin)]
       });
       return;
     }
@@ -67,12 +71,13 @@ module.exports = {
       const targetLevel = getMemberLevelInfo(message.guild.id, targetMember.id);
 
       if (!access.adminBypass && targetLevel.level < 4) {
-        await message.reply("Member itu belum membuka sistem coin dan shop karena masih di bawah Level 4.");
+        await message.reply(`Member itu belum membuka sistem ${GAZECOIN_NAME} dan shop karena masih di bawah Level 4.`);
         return;
       }
 
+      const gazecoin = await getGazecoinDisplay(message.client || message.guild.client || null);
       await message.reply({
-        embeds: [buildShopBalanceEmbed(targetMember, targetLevel, getEconomySummary(message.guild.id, targetMember.id))]
+        embeds: [buildShopBalanceEmbed(targetMember, targetLevel, getEconomySummary(message.guild.id, targetMember.id), gazecoin)]
       });
       return;
     }
@@ -90,6 +95,6 @@ module.exports = {
       return;
     }
 
-    await message.reply("Gunakan `sk shop catalog`, `sk shop balance`, `sk shop buy <item>`, atau `sk shop grant @user <jumlah>`.");
+    await message.reply(`Gunakan \`sk shop catalog\`, \`sk shop balance\`, \`sk shop buy <item>\`, atau \`sk shop grant @user <jumlah>\` untuk kelola ${GAZECOIN_NAME}.`);
   }
 };

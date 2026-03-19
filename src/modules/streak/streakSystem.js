@@ -9,6 +9,7 @@ const {
 const { createStreakNotificationCard } = require("./streakCard");
 const { createStreakInfoCard } = require("./streakInfoCard");
 const { createStreakTopBoardCard } = require("./streakTopBoardCard");
+const { awardStreakXp } = require("../levels/levelSystem");
 const streakTopBoardRefreshes = new Map();
 const PENDING_STREAK_EMOJI = "❓";
 
@@ -1066,6 +1067,7 @@ async function handleActivePairInteraction(message, client, settings, pair, part
   );
 
   await completePairStreak(message, completedPair);
+  await awardStreakXp(message.guild, completedPair.userIds, client, message.channel.id);
   await replyWithTemporaryMessage(message, "Streak hari ini selesai.", client);
   return true;
 }
@@ -1114,6 +1116,7 @@ async function handlePendingAcceptance(message, client, settings, pendingTargetI
   await completePairStreak(message, acceptedPair, {
     additionalMessages: [inviteMessage]
   });
+  await awardStreakXp(message.guild, acceptedPair.userIds, client, message.channel.id);
   return true;
 }
 

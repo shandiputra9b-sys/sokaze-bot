@@ -1,9 +1,11 @@
 const { PermissionFlagsBits, SlashCommandBuilder } = require("discord.js");
 const {
+  GAZECOIN_NAME,
   SHOP_ITEMS,
   buildShopBalanceEmbed,
   buildShopCatalogEmbed,
   ensureShopAccess,
+  getGazecoinDisplay,
   getEconomySummary,
   grantCoinsToMember,
   hasShopAdminPermission,
@@ -14,12 +16,12 @@ const { getMemberLevelInfo } = require("../levels/levelSystem");
 
 const slashData = new SlashCommandBuilder()
   .setName("shop")
-  .setDescription("Lihat saldo coin dan belanja reward Sokaze")
+  .setDescription(`Lihat saldo ${GAZECOIN_NAME} dan belanja reward Sokaze`)
   .setDMPermission(false)
   .addSubcommand((subcommand) =>
     subcommand
       .setName("balance")
-      .setDescription("Lihat saldo coin milikmu atau member lain")
+      .setDescription(`Lihat saldo ${GAZECOIN_NAME} milikmu atau member lain`)
       .addUserOption((option) =>
         option
           .setName("member")
@@ -55,7 +57,7 @@ const slashData = new SlashCommandBuilder()
   .addSubcommand((subcommand) =>
     subcommand
       .setName("grant")
-      .setDescription("Tambah coin ke member untuk admin/testing")
+      .setDescription(`Tambah ${GAZECOIN_NAME} ke member untuk admin/testing`)
       .addUserOption((option) =>
         option
           .setName("member")
@@ -65,7 +67,7 @@ const slashData = new SlashCommandBuilder()
       .addIntegerOption((option) =>
         option
           .setName("amount")
-          .setDescription("Jumlah coin")
+          .setDescription(`Jumlah ${GAZECOIN_NAME}`)
           .setMinValue(1)
           .setRequired(true)
       )
@@ -85,9 +87,10 @@ module.exports = {
     const subcommand = interaction.options.getSubcommand();
 
     if (subcommand === "grant") {
+      const gazecoin = await getGazecoinDisplay(interaction.client);
       if (!hasShopAdminPermission(interaction.member)) {
         await interaction.reply({
-          content: "Kamu butuh permission Manage Server untuk menambah coin member.",
+          content: `Kamu butuh permission Manage Server untuk menambah ${GAZECOIN_NAME} member.`,
           ephemeral: true
         });
         return;
@@ -113,7 +116,7 @@ module.exports = {
 
       await interaction.reply({
         content: result.ok
-          ? `Berhasil menambahkan coin untuk ${targetMember}. Saldo baru: **${result.entry.balance.toLocaleString("id-ID")} coin**.`
+          ? `${gazecoin} Berhasil menambahkan ${GAZECOIN_NAME} untuk ${targetMember}. Saldo baru: **${result.entry.balance.toLocaleString("id-ID")} ${GAZECOIN_NAME}**.`
           : result.reason,
         ephemeral: true
       });
@@ -132,9 +135,10 @@ module.exports = {
 
     if (subcommand === "catalog") {
       const snapshot = await buildProfileSnapshot(interaction.guild, interaction.member);
+      const gazecoin = await getGazecoinDisplay(interaction.client);
 
       await interaction.reply({
-        embeds: [buildShopCatalogEmbed(snapshot)],
+        embeds: [buildShopCatalogEmbed(snapshot, gazecoin)],
         ephemeral: true
       });
       return;
@@ -157,14 +161,15 @@ module.exports = {
 
       if (!access.adminBypass && targetLevel.level < 4) {
         await interaction.reply({
-          content: "Member itu belum membuka sistem coin dan shop karena masih di bawah Level 4.",
+          content: `Member itu belum membuka sistem ${GAZECOIN_NAME} dan shop karena masih di bawah Level 4.`,
           ephemeral: true
         });
         return;
       }
 
+      const gazecoin = await getGazecoinDisplay(interaction.client);
       await interaction.reply({
-        embeds: [buildShopBalanceEmbed(targetMember, targetLevel, getEconomySummary(interaction.guildId, targetMember.id))],
+        embeds: [buildShopBalanceEmbed(targetMember, targetLevel, getEconomySummary(interaction.guildId, targetMember.id), gazecoin)],
         ephemeral: true
       });
       return;

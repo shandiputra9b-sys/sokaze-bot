@@ -9,6 +9,7 @@ const { bootstrapTempVoiceRooms } = require("../modules/temp-voice/tempVoiceSyst
 const { startCustomRoleScheduler } = require("../modules/custom-roles/customRoleSystem");
 const { startShopEconomyScheduler } = require("../modules/shop/shopSystem");
 const { startPrivateRoomScheduler } = require("../modules/private-rooms/privateRoomSystem");
+const { reconcileLevelState, startLevelProgressionScheduler } = require("../modules/levels/levelSystem");
 
 module.exports = {
   name: "clientReady",
@@ -48,11 +49,16 @@ module.exports = {
       console.error("Failed to bootstrap temp voice rooms:", error);
     });
 
+    await reconcileLevelState(client).catch((error) => {
+      console.error("Failed to reconcile level state:", error);
+    });
+
     startStreakTopBoardScheduler(client);
     startLeaderboardScheduler(client);
     startCustomRoleScheduler(client);
     startShopEconomyScheduler(client);
     startPrivateRoomScheduler(client);
+    startLevelProgressionScheduler(client);
     await refreshAllMusicBoards(client).catch((error) => {
       console.error("Failed to refresh music boards:", error);
     });

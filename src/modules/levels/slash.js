@@ -1,16 +1,31 @@
 const {
-  PermissionFlagsBits,
+  ChannelType,
   SlashCommandBuilder
 } = require("discord.js");
 const {
   LEVEL_MAX,
   LEVEL_MIN,
+  buildLevelRoleStatusEmbed,
   buildLevelStatusEmbed,
   clampLevel,
   getMemberLevelInfo,
   hasLevelAdminPermission,
-  setMemberLevel
+  setLevelAnnounceChannel,
+  setLevelCadence,
+  setLevelMinimumChatLength,
+  setLevelRole,
+  setLevelThreshold,
+  setLevelXpReward,
+  syncLevelRolesForGuild,
+  syncManualLevelForMember
 } = require("./levelSystem");
+
+function buildSettingsReply(interaction) {
+  return {
+    embeds: [buildLevelRoleStatusEmbed(interaction.guildId, interaction.client)],
+    ephemeral: true
+  };
+}
 
 const slashData = new SlashCommandBuilder()
   .setName("level")
@@ -30,7 +45,7 @@ const slashData = new SlashCommandBuilder()
   .addSubcommand((subcommand) =>
     subcommand
       .setName("set")
-      .setDescription("Atur level member")
+      .setDescription("Atur tier level member")
       .addUserOption((option) =>
         option
           .setName("member")
@@ -43,6 +58,130 @@ const slashData = new SlashCommandBuilder()
           .setDescription(`Level ${LEVEL_MIN}-${LEVEL_MAX}`)
           .setMinValue(LEVEL_MIN)
           .setMaxValue(LEVEL_MAX)
+          .setRequired(true)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("set-role")
+      .setDescription("Atur atau kosongkan role untuk tier level tertentu")
+      .addIntegerOption((option) =>
+        option
+          .setName("level")
+          .setDescription(`Level ${LEVEL_MIN}-${LEVEL_MAX}`)
+          .setMinValue(LEVEL_MIN)
+          .setMaxValue(LEVEL_MAX)
+          .setRequired(true)
+      )
+      .addRoleOption((option) =>
+        option
+          .setName("role")
+          .setDescription("Role target, kosongkan untuk reset")
+          .setRequired(false)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("role-status")
+      .setDescription("Lihat mapping role dan konfigurasi XP level")
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("sync-roles")
+      .setDescription("Sinkronkan role level untuk member atau seluruh server")
+      .addUserOption((option) =>
+        option
+          .setName("member")
+          .setDescription("Member target")
+          .setRequired(false)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("set-announce")
+      .setDescription("Atur channel notifikasi level up")
+      .addChannelOption((option) =>
+        option
+          .setName("channel")
+          .setDescription("Channel target, kosongkan untuk reset ke auto")
+          .addChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement)
+          .setRequired(false)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("set-threshold")
+      .setDescription("Atur threshold XP untuk level tertentu")
+      .addIntegerOption((option) =>
+        option
+          .setName("level")
+          .setDescription("Target level 2-5")
+          .setMinValue(2)
+          .setMaxValue(LEVEL_MAX)
+          .setRequired(true)
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName("xp")
+          .setDescription("Jumlah XP threshold")
+          .setMinValue(0)
+          .setRequired(true)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("set-reward")
+      .setDescription("Atur reward XP per sumber")
+      .addStringOption((option) =>
+        option
+          .setName("source")
+          .setDescription("Sumber XP")
+          .addChoices(
+            { name: "chat", value: "chat" },
+            { name: "voice", value: "voice" },
+            { name: "streak", value: "streak" }
+          )
+          .setRequired(true)
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName("amount")
+          .setDescription("Jumlah XP per reward")
+          .setMinValue(0)
+          .setRequired(true)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("set-cadence")
+      .setDescription("Atur interval reward XP untuk chat atau voice")
+      .addStringOption((option) =>
+        option
+          .setName("target")
+          .setDescription("Cadence target")
+          .addChoices(
+            { name: "chat", value: "chat" },
+            { name: "voice", value: "voice" }
+          )
+          .setRequired(true)
+      )
+      .addIntegerOption((option) =>
+        option
+          .setName("minutes")
+          .setDescription("Jumlah menit")
+          .setMinValue(1)
+          .setRequired(true)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("set-min-length")
+      .setDescription("Atur minimal karakter chat untuk dapat XP")
+      .addIntegerOption((option) =>
+        option
+          .setName("value")
+          .setDescription("Jumlah karakter")
+          .setMinValue(0)
           .setRequired(true)
       )
   );
@@ -64,7 +203,7 @@ module.exports = {
       || await interaction.guild.members.fetch(targetUser.id).catch(() => null);
 
     if (subcommand === "status") {
-      const levelInfo = getMemberLevelInfo(interaction.guildId, targetUser.id);
+      const levelInfo = getMemberLevelInfo(interaction.guildId, targetUser.id, interaction.client);
 
       await interaction.reply({
         embeds: [buildLevelStatusEmbed(interaction.guild, targetMember || targetUser, levelInfo)],
@@ -73,9 +212,106 @@ module.exports = {
       return;
     }
 
+    if (subcommand === "role-status") {
+      if (!hasLevelAdminPermission(interaction.member)) {
+        await interaction.reply({
+          content: "Kamu butuh permission Manage Server untuk melihat pengaturan level.",
+          ephemeral: true
+        });
+        return;
+      }
+
+      await interaction.reply(buildSettingsReply(interaction));
+      return;
+    }
+
     if (!hasLevelAdminPermission(interaction.member)) {
       await interaction.reply({
-        content: "Kamu butuh permission Manage Server untuk mengatur level member.",
+        content: "Kamu butuh permission Manage Server untuk mengatur progression level.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (subcommand === "set-role") {
+      const targetLevel = clampLevel(interaction.options.getInteger("level", true));
+      const role = interaction.options.getRole("role");
+      setLevelRole(interaction.guildId, targetLevel, role?.id || "");
+
+      await interaction.reply(buildSettingsReply(interaction));
+      return;
+    }
+
+    if (subcommand === "set-announce") {
+      const channel = interaction.options.getChannel("channel");
+      setLevelAnnounceChannel(interaction.guildId, channel?.id || "");
+
+      await interaction.reply({
+        content: channel
+          ? `Channel notifikasi level up diset ke ${channel}.`
+          : "Channel notifikasi level up direset ke mode auto.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (subcommand === "set-threshold") {
+      const targetLevel = interaction.options.getInteger("level", true);
+      const xp = interaction.options.getInteger("xp", true);
+      const result = setLevelThreshold(interaction.guildId, targetLevel, xp, interaction.client);
+
+      await interaction.reply(result.ok
+        ? buildSettingsReply(interaction)
+        : {
+          content: result.reason,
+          ephemeral: true
+        });
+      return;
+    }
+
+    if (subcommand === "set-reward") {
+      const source = interaction.options.getString("source", true);
+      const amount = interaction.options.getInteger("amount", true);
+      const result = setLevelXpReward(interaction.guildId, source, amount);
+
+      await interaction.reply(result.ok
+        ? buildSettingsReply(interaction)
+        : {
+          content: result.reason,
+          ephemeral: true
+        });
+      return;
+    }
+
+    if (subcommand === "set-cadence") {
+      const target = interaction.options.getString("target", true);
+      const minutes = interaction.options.getInteger("minutes", true);
+      const result = setLevelCadence(interaction.guildId, target, minutes);
+
+      await interaction.reply(result.ok
+        ? buildSettingsReply(interaction)
+        : {
+          content: result.reason,
+          ephemeral: true
+        });
+      return;
+    }
+
+    if (subcommand === "set-min-length") {
+      setLevelMinimumChatLength(interaction.guildId, interaction.options.getInteger("value", true));
+
+      await interaction.reply(buildSettingsReply(interaction));
+      return;
+    }
+
+    if (subcommand === "sync-roles") {
+      const member = interaction.options.getMember("member");
+      const synced = await syncLevelRolesForGuild(interaction.guild, interaction.client, member?.id || "");
+
+      await interaction.reply({
+        content: member
+          ? `Role level untuk ${member} berhasil disinkronkan.`
+          : `Sinkronisasi role level selesai untuk ${synced} member.`,
         ephemeral: true
       });
       return;
@@ -90,11 +326,11 @@ module.exports = {
     }
 
     const nextLevel = clampLevel(interaction.options.getInteger("value", true));
-    setMemberLevel(interaction.guildId, targetMember.id, nextLevel, {
+    await syncManualLevelForMember(targetMember, nextLevel, interaction.client, {
       source: "manual"
     });
 
-    const levelInfo = getMemberLevelInfo(interaction.guildId, targetMember.id);
+    const levelInfo = getMemberLevelInfo(interaction.guildId, targetMember.id, interaction.client);
 
     await interaction.reply({
       embeds: [buildLevelStatusEmbed(interaction.guild, targetMember, levelInfo)],

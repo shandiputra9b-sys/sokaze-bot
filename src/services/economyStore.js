@@ -55,8 +55,16 @@ function updateEconomyEntry(guildId, userId, updater) {
     balance: 0,
     totalEarned: 0,
     totalSpent: 0,
+    chatDailyDate: "",
+    chatDailyCount: 0,
+    lastChatFingerprint: "",
+    lastChatMessageAt: "",
     lastChatCoinAt: "",
     lastVoiceCoinAt: "",
+    lastVoiceProgressAt: "",
+    voiceSessionStartedAt: "",
+    voiceSessionEarned: 0,
+    voiceEligibilityState: "idle",
     updatedAt: new Date().toISOString()
   };
   const next = updater(current);

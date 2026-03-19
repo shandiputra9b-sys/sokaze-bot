@@ -1,6 +1,6 @@
 const { EmbedBuilder, PermissionFlagsBits } = require("discord.js");
 const { addCoins, getEconomyEntry, spendCoins, updateEconomyEntry } = require("../../services/economyStore");
-const { listVoiceSessions } = require("../../services/leaderboardStore");
+const { getVoiceSession, listVoiceSessions } = require("../../services/leaderboardStore");
 const {
   SHOP_PROFILE_THEMES,
   SHOP_PROFILE_TITLES,
@@ -18,16 +18,17 @@ const { extendOwnedPrivateRoom } = require("../private-rooms/privateRoomSystem")
 const { findPrivateRoomByOwner } = require("../../services/privateRoomStore");
 
 const SHOP_ACCESS_LEVEL = 4;
-const CHAT_COIN_COOLDOWN_MS = 60 * 1000;
-const VOICE_COIN_INTERVAL_MS = 15 * 60 * 1000;
-const CHAT_COIN_REWARD = {
-  4: 4,
-  5: 5
-};
-const VOICE_COIN_REWARD = {
-  4: 10,
-  5: 12
-};
+const GAZECOIN_NAME = "Gazecoin";
+const GAZECOIN_SHORT = "GZC";
+const GAZECOIN_EMOJI_ID = "1484304051423285308";
+const GAZECOIN_TIMEZONE = "Asia/Jakarta";
+const ENABLE_GAZECOIN_DM_SUMMARY = false;
+const CHAT_COIN_DAILY_CAP = 100;
+const CHAT_COIN_REWARD = 1;
+const REPEATED_CHAT_WINDOW_MS = 10 * 60 * 1000;
+const VOICE_COIN_INTERVAL_MS = 10 * 60 * 1000;
+const VOICE_COIN_REWARD = 5;
+const SHOP_SCHEDULER_INTERVAL_MS = 60 * 1000;
 
 const SHOP_ITEMS = [
   {
@@ -75,7 +76,30 @@ const SHOP_ITEMS = [
 ];
 
 function formatCoins(value) {
-  return `${new Intl.NumberFormat("id-ID").format(Math.max(0, value || 0))} coin`;
+  return `${new Intl.NumberFormat("id-ID").format(Math.max(0, value || 0))} ${GAZECOIN_NAME}`;
+}
+
+async function getGazecoinDisplay(client) {
+  if (!client) {
+    return GAZECOIN_SHORT;
+  }
+
+  if (client?.gazecoinEmojiDisplay) {
+    return client.gazecoinEmojiDisplay;
+  }
+
+  try {
+    const application = client?.application?.partial
+      ? await client.application.fetch()
+      : client?.application;
+    const emoji = application?.emojis?.cache?.get(GAZECOIN_EMOJI_ID)
+      || await application?.emojis?.fetch?.(GAZECOIN_EMOJI_ID).catch(() => null);
+
+    client.gazecoinEmojiDisplay = emoji?.toString() || GAZECOIN_SHORT;
+    return client.gazecoinEmojiDisplay;
+  } catch {
+    return GAZECOIN_SHORT;
+  }
 }
 
 function hasShopAdminPermission(member) {
@@ -97,19 +121,28 @@ function ensureShopAccess(guildId, userId, member) {
 
   return {
     ok: false,
-    reason: "Shop dan coin baru terbuka mulai Level 4."
+    reason: `Shop dan ${GAZECOIN_NAME} baru terbuka mulai Level 4.`
   };
 }
 
 function getEconomySummary(guildId, userId) {
   const entry = getEconomyEntry(guildId, userId) || null;
+  const todayKey = getDateKey();
 
   return {
     balance: entry?.balance || 0,
     totalEarned: entry?.totalEarned || 0,
     totalSpent: entry?.totalSpent || 0,
+    chatDailyDate: entry?.chatDailyDate || "",
+    chatDailyCount: entry?.chatDailyDate === todayKey ? (entry?.chatDailyCount || 0) : 0,
+    lastChatFingerprint: entry?.lastChatFingerprint || "",
+    lastChatMessageAt: entry?.lastChatMessageAt || "",
     lastChatCoinAt: entry?.lastChatCoinAt || "",
-    lastVoiceCoinAt: entry?.lastVoiceCoinAt || ""
+    lastVoiceCoinAt: entry?.lastVoiceCoinAt || "",
+    lastVoiceProgressAt: entry?.lastVoiceProgressAt || "",
+    voiceSessionStartedAt: entry?.voiceSessionStartedAt || "",
+    voiceSessionEarned: entry?.voiceSessionEarned || 0,
+    voiceEligibilityState: entry?.voiceEligibilityState || "idle"
   };
 }
 
@@ -129,10 +162,10 @@ function isProfileUnlockOwned(snapshot, item) {
   return false;
 }
 
-function buildShopBalanceEmbed(targetMember, levelInfo, summary) {
+function buildShopBalanceEmbed(targetMember, levelInfo, summary, gazecoinDisplay = GAZECOIN_SHORT) {
   return new EmbedBuilder()
     .setColor("#111214")
-    .setTitle("Shop Balance")
+    .setTitle(`${gazecoinDisplay} Shop Balance`)
     .setDescription(
       [
         `User: ${targetMember}`,
@@ -142,7 +175,7 @@ function buildShopBalanceEmbed(targetMember, levelInfo, summary) {
     )
     .addFields(
       {
-        name: "Total Earned",
+        name: `Total ${GAZECOIN_NAME}`,
         value: formatCoins(summary.totalEarned),
         inline: true
       },
@@ -155,12 +188,17 @@ function buildShopBalanceEmbed(targetMember, levelInfo, summary) {
         name: "Shop Status",
         value: levelInfo.level >= SHOP_ACCESS_LEVEL ? "Terbuka" : "Terkunci sampai Level 4",
         inline: true
+      },
+      {
+        name: "Chat Hari Ini",
+        value: `${summary.chatDailyCount}/${CHAT_COIN_DAILY_CAP} ${GAZECOIN_SHORT}`,
+        inline: true
       }
     )
     .setTimestamp();
 }
 
-function buildShopCatalogEmbed(snapshot) {
+function buildShopCatalogEmbed(snapshot, gazecoinDisplay = GAZECOIN_SHORT) {
   const available = SHOP_ITEMS.filter((item) => snapshot.levelInfo.level >= item.minLevel);
   const locked = SHOP_ITEMS.filter((item) => snapshot.levelInfo.level < item.minLevel);
 
@@ -171,13 +209,13 @@ function buildShopCatalogEmbed(snapshot) {
 
   return new EmbedBuilder()
     .setColor("#111214")
-    .setTitle("Sokaze Shop")
+    .setTitle(`${gazecoinDisplay} Sokaze Shop`)
     .setDescription(
       [
         `Tier kamu: **${snapshot.levelInfo.code} ${snapshot.levelInfo.name}**`,
         `Saldo saat ini: **${formatCoins(getEconomySummary(snapshot.guild.id, snapshot.member.id).balance)}**`,
         "",
-        "Item utility dan cosmetic profile di bawah bisa dibeli dengan coin."
+        `Item utility dan cosmetic profile di bawah bisa dibeli dengan ${GAZECOIN_NAME}.`
       ].join("\n")
     )
     .addFields(
@@ -199,11 +237,71 @@ function buildShopCatalogEmbed(snapshot) {
 }
 
 function getChatRewardForLevel(level) {
-  return CHAT_COIN_REWARD[level] || 0;
+  return level >= SHOP_ACCESS_LEVEL ? CHAT_COIN_REWARD : 0;
 }
 
 function getVoiceRewardForLevel(level) {
-  return VOICE_COIN_REWARD[level] || 0;
+  return level >= SHOP_ACCESS_LEVEL ? VOICE_COIN_REWARD : 0;
+}
+
+function getDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: GAZECOIN_TIMEZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
+
+function normalizeChatFingerprint(message) {
+  const content = String(message.content || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ");
+
+  if (content) {
+    return content;
+  }
+
+  if (message.attachments.size) {
+    const attachmentNames = [...message.attachments.values()]
+      .map((attachment) => String(attachment.name || attachment.contentType || "attachment").toLowerCase())
+      .sort();
+    return `attachment:${attachmentNames.join("|")}`;
+  }
+
+  return "";
+}
+
+function formatDurationShort(totalMs) {
+  const ms = Math.max(0, totalMs || 0);
+  const totalMinutes = Math.floor(ms / 60000);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours <= 0) {
+    return `${minutes} menit`;
+  }
+
+  return `${hours} jam ${minutes} menit`;
+}
+
+function isEligibleVoiceState(state) {
+  const channel = state?.channel;
+
+  if (!channel) {
+    return false;
+  }
+
+  const activeHumans = channel.members.filter((voiceMember) => !voiceMember.user.bot).size;
+
+  return activeHumans >= 2
+    && !state.selfMute
+    && !state.serverMute
+    && !state.selfDeaf
+    && !state.serverDeaf;
 }
 
 async function awardTrackedChatCoins(message) {
@@ -213,16 +311,27 @@ async function awardTrackedChatCoins(message) {
     return false;
   }
 
-  const meaningfulLength = `${message.content || ""}`.trim().length;
+  const fingerprint = normalizeChatFingerprint(message);
 
-  if (meaningfulLength < 6 && !message.attachments.size) {
+  if (!fingerprint) {
     return false;
   }
 
   const entry = getEconomyEntry(message.guild.id, message.author.id);
-  const lastAwardAt = entry?.lastChatCoinAt ? new Date(entry.lastChatCoinAt).getTime() : 0;
+  const todayKey = getDateKey();
+  const dailyCount = entry?.chatDailyDate === todayKey ? (entry?.chatDailyCount || 0) : 0;
 
-  if (lastAwardAt && (Date.now() - lastAwardAt) < CHAT_COIN_COOLDOWN_MS) {
+  if (dailyCount >= CHAT_COIN_DAILY_CAP) {
+    return false;
+  }
+
+  const lastMessageAt = entry?.lastChatMessageAt ? new Date(entry.lastChatMessageAt).getTime() : 0;
+  if (
+    entry?.lastChatFingerprint
+    && entry.lastChatFingerprint === fingerprint
+    && lastMessageAt
+    && (Date.now() - lastMessageAt) < REPEATED_CHAT_WINDOW_MS
+  ) {
     return false;
   }
 
@@ -233,6 +342,10 @@ async function awardTrackedChatCoins(message) {
   }
 
   addCoins(message.guild.id, message.author.id, reward, {
+    chatDailyDate: todayKey,
+    chatDailyCount: dailyCount + reward,
+    lastChatFingerprint: fingerprint,
+    lastChatMessageAt: new Date().toISOString(),
     lastChatCoinAt: new Date().toISOString()
   });
 
@@ -260,8 +373,21 @@ async function processVoiceCoinAwards(client) {
       }
 
       const activeHumans = channel.members.filter((voiceMember) => !voiceMember.user.bot).size;
+      const voiceState = member.voice;
+      const ineligibleForVoiceReward = activeHumans < 2
+        || voiceState.selfMute
+        || voiceState.serverMute
+        || voiceState.selfDeaf
+        || voiceState.serverDeaf;
 
-      if (activeHumans < 2) {
+      if (ineligibleForVoiceReward) {
+        if ((getEconomyEntry(guild.id, member.id)?.voiceEligibilityState || "idle") !== "paused") {
+          updateEconomyEntry(guild.id, member.id, (current) => ({
+            ...current,
+            voiceEligibilityState: "paused",
+            lastVoiceProgressAt: new Date().toISOString()
+          }));
+        }
         continue;
       }
 
@@ -271,23 +397,187 @@ async function processVoiceCoinAwards(client) {
         continue;
       }
 
-      const entry = getEconomyEntry(guild.id, member.id);
-      const lastAwardAt = entry?.lastVoiceCoinAt ? new Date(entry.lastVoiceCoinAt).getTime() : 0;
+      const entry = getEconomyEntry(guild.id, member.id) || null;
+      const eligibilityState = entry?.voiceEligibilityState || "idle";
+      const progressAnchor = entry?.lastVoiceProgressAt
+        ? new Date(entry.lastVoiceProgressAt).getTime()
+        : 0;
+      const baselineTime = eligibilityState === "eligible" && progressAnchor
+        ? progressAnchor
+        : eligibilityState === "paused"
+          ? Date.now()
+          : new Date(session.startedAt).getTime();
 
-      if (lastAwardAt && (Date.now() - lastAwardAt) < VOICE_COIN_INTERVAL_MS) {
+      if (eligibilityState !== "eligible") {
+        updateEconomyEntry(guild.id, member.id, (current) => ({
+          ...current,
+          voiceEligibilityState: "eligible",
+          voiceSessionStartedAt: current.voiceSessionStartedAt || new Date().toISOString(),
+          voiceSessionEarned: current.voiceSessionEarned || 0,
+          lastVoiceProgressAt: new Date(baselineTime).toISOString()
+        }));
         continue;
       }
 
-      const reward = getVoiceRewardForLevel(levelInfo.level);
+      const elapsedMs = Date.now() - baselineTime;
+      const intervals = Math.floor(elapsedMs / VOICE_COIN_INTERVAL_MS);
+
+      if (intervals <= 0) {
+        continue;
+      }
+
+      const reward = intervals * getVoiceRewardForLevel(levelInfo.level);
 
       if (!reward) {
         continue;
       }
 
+      const nextProgressAt = new Date(baselineTime + (intervals * VOICE_COIN_INTERVAL_MS)).toISOString();
       addCoins(guild.id, member.id, reward, {
-        lastVoiceCoinAt: new Date().toISOString()
+        lastVoiceCoinAt: new Date().toISOString(),
+        lastVoiceProgressAt: nextProgressAt,
+        voiceSessionStartedAt: entry?.voiceSessionStartedAt || new Date().toISOString(),
+        voiceSessionEarned: (entry?.voiceSessionEarned || 0) + reward,
+        voiceEligibilityState: "eligible"
       });
     }
+  }
+}
+
+async function settleVoiceGazecoinFromState(state, client) {
+  const member = state?.member;
+
+  if (!member || member.user?.bot || !isEligibleVoiceState(state)) {
+    return false;
+  }
+
+  const levelInfo = getMemberLevelInfo(member.guild.id, member.id);
+
+  if (levelInfo.level < SHOP_ACCESS_LEVEL) {
+    return false;
+  }
+
+  const entry = getEconomyEntry(member.guild.id, member.id) || null;
+  const session = getVoiceSession(member.guild.id, member.id);
+
+  if (!session && !entry?.voiceSessionStartedAt) {
+    return false;
+  }
+
+  const baselineTime = entry?.lastVoiceProgressAt
+    ? new Date(entry.lastVoiceProgressAt).getTime()
+    : new Date(session?.startedAt || entry.voiceSessionStartedAt).getTime();
+  const elapsedMs = Date.now() - baselineTime;
+  const intervals = Math.floor(elapsedMs / VOICE_COIN_INTERVAL_MS);
+
+  if (intervals <= 0) {
+    return false;
+  }
+
+  const reward = intervals * getVoiceRewardForLevel(levelInfo.level);
+
+  if (!reward) {
+    return false;
+  }
+
+  const nextProgressAt = new Date(baselineTime + (intervals * VOICE_COIN_INTERVAL_MS)).toISOString();
+  addCoins(member.guild.id, member.id, reward, {
+    lastVoiceCoinAt: new Date().toISOString(),
+    lastVoiceProgressAt: nextProgressAt,
+    voiceSessionStartedAt: entry?.voiceSessionStartedAt || session?.startedAt || new Date().toISOString(),
+    voiceSessionEarned: (entry?.voiceSessionEarned || 0) + reward,
+    voiceEligibilityState: "eligible"
+  });
+
+  return true;
+}
+
+async function sendVoiceGazecoinSummary(member, client) {
+  if (!ENABLE_GAZECOIN_DM_SUMMARY) {
+    return false;
+  }
+
+  const entry = getEconomyEntry(member.guild.id, member.id);
+
+  if (!entry?.voiceSessionEarned || !entry.voiceSessionStartedAt) {
+    return false;
+  }
+
+  const gazecoin = await getGazecoinDisplay(client);
+  const startedAt = new Date(entry.voiceSessionStartedAt).getTime();
+  const durationLabel = formatDurationShort(Date.now() - startedAt);
+  const embed = new EmbedBuilder()
+    .setColor("#111214")
+    .setTitle("Sokaze Voice Summary")
+    .setDescription(
+      [
+        `${gazecoin} Kamu mengumpulkan **${entry.voiceSessionEarned} ${GAZECOIN_NAME}** dari sesi voice terakhir.`,
+        `Durasi sesi: **${durationLabel}**`,
+        `Saldo sekarang: **${formatCoins(entry.balance || 0)}**`
+      ].join("\n")
+    )
+    .setFooter({
+      text: "Notifikasi ini hanya dikirim ke kamu"
+    })
+    .setTimestamp();
+
+  await member.user.send({
+    embeds: [embed]
+  }).catch(() => null);
+
+  return true;
+}
+
+async function handleVoiceStateGazecoin(oldState, newState, client) {
+  const member = newState.member || oldState.member;
+
+  if (!member || member.user?.bot) {
+    return;
+  }
+
+  const oldChannelId = oldState.channelId || "";
+  const newChannelId = newState.channelId || "";
+  const oldEligible = isEligibleVoiceState(oldState);
+  const newEligible = isEligibleVoiceState(newState);
+
+  if (oldChannelId && (oldChannelId !== newChannelId || (oldEligible && !newEligible))) {
+    await settleVoiceGazecoinFromState(oldState, client);
+  }
+
+  if (!oldChannelId && newChannelId) {
+    updateEconomyEntry(member.guild.id, member.id, (current) => ({
+      ...current,
+      voiceSessionStartedAt: new Date().toISOString(),
+      voiceSessionEarned: 0,
+      lastVoiceProgressAt: "",
+      voiceEligibilityState: "idle"
+    }));
+    return;
+  }
+
+  if (oldChannelId && !newChannelId) {
+    const latestEntry = getEconomyEntry(member.guild.id, member.id);
+
+    if (latestEntry?.voiceSessionEarned) {
+      await sendVoiceGazecoinSummary(member, client);
+    }
+
+    updateEconomyEntry(member.guild.id, member.id, (current) => ({
+      ...current,
+      lastVoiceProgressAt: "",
+      voiceSessionStartedAt: "",
+      voiceSessionEarned: 0,
+      voiceEligibilityState: "idle"
+    }));
+    return;
+  }
+
+  if (oldChannelId && newChannelId && oldChannelId !== newChannelId) {
+    updateEconomyEntry(member.guild.id, member.id, (current) => ({
+      ...current,
+      lastVoiceProgressAt: "",
+      voiceEligibilityState: "idle"
+    }));
   }
 }
 
@@ -308,7 +598,7 @@ function startShopEconomyScheduler(client) {
     run().catch((error) => {
       console.error("Scheduled shop economy sync failed:", error);
     });
-  }, 5 * 60 * 1000);
+  }, SHOP_SCHEDULER_INTERVAL_MS);
 
   if (typeof client.shopEconomyScheduler.unref === "function") {
     client.shopEconomyScheduler.unref();
@@ -321,7 +611,7 @@ function grantCoinsToMember(guildId, userId, amount) {
   if (!increment) {
     return {
       ok: false,
-      reason: "Jumlah coin harus lebih besar dari 0."
+      reason: `Jumlah ${GAZECOIN_NAME} harus lebih besar dari 0.`
     };
   }
 
@@ -335,6 +625,7 @@ function grantCoinsToMember(guildId, userId, amount) {
 async function redeemShopItem(guild, member, itemKey) {
   const levelInfo = getMemberLevelInfo(guild.id, member.id);
   const item = getShopItemByKey(itemKey);
+  const gazecoin = await getGazecoinDisplay(guild.client);
 
   if (!item) {
     return {
@@ -402,7 +693,7 @@ async function redeemShopItem(guild, member, itemKey) {
   if (!payment.ok) {
     return {
       ok: false,
-      reason: `Coin kamu belum cukup. Butuh **${formatCoins(item.cost)}** untuk item ini.`
+      reason: `${GAZECOIN_NAME} kamu belum cukup. Butuh **${formatCoins(item.cost)}** untuk item ini.`
     };
   }
 
@@ -412,7 +703,7 @@ async function redeemShopItem(guild, member, itemKey) {
     return {
       ok: true,
       item,
-      message: `Cooldown fast rename kamu berhasil di-reset. Sisa saldo: **${formatCoins(payment.entry.balance)}**.`
+      message: `${gazecoin} Cooldown fast rename kamu berhasil di-reset. Sisa saldo: **${formatCoins(payment.entry.balance)}**.`
     };
   }
 
@@ -430,7 +721,7 @@ async function redeemShopItem(guild, member, itemKey) {
     return {
       ok: true,
       item,
-      message: `Theme **${result.theme.label}** berhasil dibuka. Sisa saldo: **${formatCoins(payment.entry.balance)}**.`
+      message: `${gazecoin} Theme **${result.theme.label}** berhasil dibuka. Sisa saldo: **${formatCoins(payment.entry.balance)}**.`
     };
   }
 
@@ -448,7 +739,7 @@ async function redeemShopItem(guild, member, itemKey) {
     return {
       ok: true,
       item,
-      message: `Title **${result.title.label}** berhasil dibuka. Sisa saldo: **${formatCoins(payment.entry.balance)}**.`
+      message: `${gazecoin} Title **${result.title.label}** berhasil dibuka. Sisa saldo: **${formatCoins(payment.entry.balance)}**.`
     };
   }
 
@@ -459,7 +750,7 @@ async function redeemShopItem(guild, member, itemKey) {
     return {
       ok: true,
       item,
-      message: `Custom role pass aktif sampai <t:${Math.floor(new Date(expiresAt).getTime() / 1000)}:F>. Sisa saldo: **${formatCoins(payment.entry.balance)}**.`
+      message: `${gazecoin} Custom role pass aktif sampai <t:${Math.floor(new Date(expiresAt).getTime() / 1000)}:F>. Sisa saldo: **${formatCoins(payment.entry.balance)}**.`
     };
   }
 
@@ -478,7 +769,7 @@ async function redeemShopItem(guild, member, itemKey) {
     return {
       ok: true,
       item,
-      message: `Private room kamu diperpanjang 12 jam. Expire baru: <t:${Math.floor(new Date(extension.expiresAt).getTime() / 1000)}:F>. Sisa saldo: **${formatCoins(payment.entry.balance)}**.`
+      message: `${gazecoin} Private room kamu diperpanjang 12 jam. Expire baru: <t:${Math.floor(new Date(extension.expiresAt).getTime() / 1000)}:F>. Sisa saldo: **${formatCoins(payment.entry.balance)}**.`
     };
   }
 
@@ -489,6 +780,8 @@ async function redeemShopItem(guild, member, itemKey) {
 }
 
 module.exports = {
+  GAZECOIN_NAME,
+  GAZECOIN_SHORT,
   SHOP_ACCESS_LEVEL,
   SHOP_ITEMS,
   awardTrackedChatCoins,
@@ -498,9 +791,12 @@ module.exports = {
   ensureShopAccess,
   formatCoins,
   getEconomySummary,
+  getGazecoinDisplay,
+  handleVoiceStateGazecoin,
   getShopItemByKey,
   grantCoinsToMember,
   hasShopAdminPermission,
+  processVoiceCoinAwards,
   redeemShopItem,
   startShopEconomyScheduler
 };
