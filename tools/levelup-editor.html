@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sokaze Level-Up Card Editor</title>
+  <link rel="stylesheet" href="/levelup-editor.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar panel">
+      <div class="section">
+        <p class="eyebrow">Sokaze Tools</p>
+        <h1>Level-up Editor</h1>
+        <p class="muted">Atur kartu level-up sendiri dan simpan langsung ke renderer bot.</p>
+      </div>
+
+      <div id="loginCard" class="section">
+        <h2>Login</h2>
+        <label>
+          Password
+          <input id="passwordInput" type="password" placeholder="EMBED_BUILDER_PASSWORD" />
+        </label>
+        <div class="button-row">
+          <button id="loginButton" class="primary">Masuk</button>
+        </div>
+        <p id="loginStatus" class="status">Gunakan password dashboard yang sama dengan embed builder.</p>
+      </div>
+
+      <div id="editorCard" class="hidden">
+        <div class="section">
+          <div class="button-row">
+            <button id="saveButton" class="success">Save Config</button>
+            <button id="resetButton">Reset Default</button>
+            <button id="logoutButton" class="ghost">Logout</button>
+          </div>
+          <p id="editorStatus" class="status">Siap mengedit.</p>
+        </div>
+
+        <div class="section">
+          <h2>Preview</h2>
+          <div class="grid two">
+            <label>
+              Prev Level
+              <input id="previewPrevious" type="number" min="0" max="999" value="66" />
+            </label>
+            <label>
+              Next Level
+              <input id="previewNext" type="number" min="1" max="999" value="67" />
+            </label>
+            <label class="full">
+              Avatar URL
+              <input id="previewAvatar" type="text" placeholder="https://..." />
+            </label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Canvas</h2>
+          <div class="grid two">
+            <label>Width<input data-path="width" type="number" min="280" max="1200" /></label>
+            <label>Height<input data-path="height" type="number" min="90" max="600" /></label>
+            <label>Radius<input data-path="borderRadius" type="number" min="0" max="80" /></label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Background</h2>
+          <div class="grid two">
+            <label>Base Start<input data-path="background.baseStart" type="color" /></label>
+            <label>Base Mid<input data-path="background.baseMid" type="color" /></label>
+            <label>Base End<input data-path="background.baseEnd" type="color" /></label>
+            <label>Border<input data-path="background.border" type="text" /></label>
+            <label class="full">Aura Left<input data-path="background.auraLeft" type="text" /></label>
+            <label class="full">Aura Right<input data-path="background.auraRight" type="text" /></label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Avatar</h2>
+          <div class="grid two">
+            <label>X<input data-path="avatar.x" type="number" /></label>
+            <label>Y<input data-path="avatar.y" type="number" /></label>
+            <label>Size<input data-path="avatar.size" type="number" /></label>
+            <label>Ring Width<input data-path="avatar.ringWidth" type="number" /></label>
+            <label>Ring Start<input data-path="avatar.ringStart" type="color" /></label>
+            <label>Ring End<input data-path="avatar.ringEnd" type="color" /></label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Title</h2>
+          <div class="grid two">
+            <label class="full">Text<input data-path="title.text" type="text" /></label>
+            <label>Center X<input data-path="title.centerX" type="number" /></label>
+            <label>Y<input data-path="title.y" type="number" /></label>
+            <label>Size<input data-path="title.size" type="number" /></label>
+            <label>Color<input data-path="title.color" type="color" /></label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Levels</h2>
+          <div class="grid two">
+            <label>Center X<input data-path="levels.centerX" type="number" /></label>
+            <label>Y<input data-path="levels.y" type="number" /></label>
+            <label>Size<input data-path="levels.size" type="number" /></label>
+            <label>Color<input data-path="levels.color" type="color" /></label>
+            <label>Separator<input data-path="levels.separator" type="text" /></label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Badge</h2>
+          <div class="grid two">
+            <label class="checkbox">
+              <input data-path="badge.enabled" type="checkbox" />
+              <span>Badge enabled</span>
+            </label>
+            <label class="full">Text<input data-path="badge.text" type="text" /></label>
+            <label>X<input data-path="badge.x" type="number" /></label>
+            <label>Y<input data-path="badge.y" type="number" /></label>
+            <label>Width<input data-path="badge.width" type="number" /></label>
+            <label>Height<input data-path="badge.height" type="number" /></label>
+            <label>Radius<input data-path="badge.radius" type="number" /></label>
+            <label>Fill<input data-path="badge.fill" type="text" /></label>
+            <label>Border<input data-path="badge.border" type="text" /></label>
+            <label>Text Size<input data-path="badge.textSize" type="number" /></label>
+            <label>Text Color<input data-path="badge.textColor" type="color" /></label>
+            <label>Text Center X<input data-path="badge.textCenterX" type="number" /></label>
+            <label>Text Center Y<input data-path="badge.textCenterY" type="number" /></label>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="workspace panel">
+      <div class="workspace-header">
+        <div>
+          <p class="eyebrow">Live Renderer</p>
+          <h2>Preview Asli Bot</h2>
+          <p class="muted">Gambar di bawah dirender dari backend yang sama dengan notifikasi level-up bot.</p>
+        </div>
+      </div>
+      <div class="preview-shell">
+        <div class="preview-bg">
+          <img id="previewImage" alt="Level-up preview" />
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/levelup-editor.js"></script>
+</body>
+</html>

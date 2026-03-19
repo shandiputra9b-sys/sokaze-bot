@@ -686,34 +686,12 @@ async function sendLevelUpNotification(guild, member, previousLevelInfo, nextLev
   }
 
   const card = await createLevelUpCard(member, previousLevelInfo, nextLevelInfo).catch(() => null);
-  const sourceLabel = source === "voice"
-    ? "suara malam"
-    : source === "streak"
-      ? "ikatan streak"
-      : "aktivitas harian";
-  const embed = new EmbedBuilder()
-    .setColor("#111214")
-    .setTitle("Sokaze Gothic Ascension")
-    .setDescription(
-      [
-        `${member} melangkah ke **${nextLevelInfo.code} ${nextLevelInfo.name}**.`,
-        `Jejak loyalitas ini ditempa lewat **${sourceLabel}** dan dibaptis dalam nuansa Sokaze.`,
-        nextLevelInfo.roleId ? `Role tier aktif: <@&${nextLevelInfo.roleId}>` : "Role tier baru belum diatur admin."
-      ].join("\n")
-    )
-    .setFooter({
-      text: `XP sekarang: ${formatXp(nextLevelInfo.xp)} | Sokaze Loyalty`
-    })
-    .setTimestamp();
-
-  if (card) {
-    embed.setImage(`attachment://${card.name}`);
+  if (!card) {
+    return false;
   }
 
   await destination.send({
-    content: `${member}`,
-    embeds: [embed],
-    files: card ? [card] : []
+    files: [card]
   }).catch(() => null);
 
   return true;

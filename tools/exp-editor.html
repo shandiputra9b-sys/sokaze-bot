@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sokaze EXP Card Editor</title>
+  <link rel="stylesheet" href="/exp-editor.css" />
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar panel">
+      <div class="section">
+        <p class="eyebrow">Sokaze Tools</p>
+        <h1>EXP Card Editor</h1>
+        <p class="muted">Atur kartu EXP minimalis dengan style dark grey ambience.</p>
+      </div>
+
+      <div id="loginCard" class="section">
+        <h2>Login</h2>
+        <label>
+          Password
+          <input id="passwordInput" type="password" placeholder="EMBED_BUILDER_PASSWORD" />
+        </label>
+        <div class="button-row">
+          <button id="loginButton" class="primary">Masuk</button>
+        </div>
+        <p id="loginStatus" class="status">Gunakan password dashboard yang sama dengan editor lain.</p>
+      </div>
+
+      <div id="editorCard" class="hidden">
+        <div class="section">
+          <div class="button-row">
+            <button id="saveButton" class="success">Save Config</button>
+            <button id="resetButton">Reset Default</button>
+            <button id="logoutButton" class="ghost">Logout</button>
+          </div>
+          <p id="editorStatus" class="status">Siap mengedit.</p>
+        </div>
+
+        <div class="section">
+          <h2>Preview</h2>
+          <div class="grid two">
+            <label>
+              Username
+              <input id="previewName" type="text" value="neoniyann" />
+            </label>
+            <label>
+              Level
+              <input id="previewLevel" type="number" min="1" max="999" value="9" />
+            </label>
+            <label>
+              XP
+              <input id="previewXp" type="number" min="0" value="475" />
+            </label>
+            <label>
+              Next Threshold
+              <input id="previewNextThreshold" type="number" min="1" value="600" />
+            </label>
+            <label class="full">
+              Avatar URL
+              <input id="previewAvatar" type="text" placeholder="https://..." />
+            </label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Canvas</h2>
+          <div class="grid two">
+            <label>Width<input data-path="width" type="number" min="280" max="1600" /></label>
+            <label>Height<input data-path="height" type="number" min="72" max="600" /></label>
+            <label>Radius<input data-path="borderRadius" type="number" min="0" max="80" /></label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Background</h2>
+          <div class="grid two">
+            <label>Base Start<input data-path="background.baseStart" type="color" /></label>
+            <label>Base End<input data-path="background.baseEnd" type="color" /></label>
+            <label>Border<input data-path="background.border" type="text" /></label>
+            <label>Accent Glow<input data-path="background.accentGlow" type="text" /></label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Avatar</h2>
+          <div class="grid two">
+            <label>X<input data-path="avatar.x" type="number" /></label>
+            <label>Y<input data-path="avatar.y" type="number" /></label>
+            <label>Size<input data-path="avatar.size" type="number" /></label>
+            <label>Radius<input data-path="avatar.radius" type="number" /></label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Username</h2>
+          <div class="grid two">
+            <label>X<input data-path="username.x" type="number" /></label>
+            <label>Y<input data-path="username.y" type="number" /></label>
+            <label>Size<input data-path="username.size" type="number" /></label>
+            <label>Color<input data-path="username.color" type="color" /></label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>XP Text</h2>
+          <div class="grid two">
+            <label>Text X<input data-path="xp.textX" type="number" /></label>
+            <label>Y<input data-path="xp.y" type="number" /></label>
+            <label>Size<input data-path="xp.size" type="number" /></label>
+            <label>Color<input data-path="xp.color" type="color" /></label>
+            <label class="full">Suffix<input data-path="xp.suffix" type="text" /></label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Level Text</h2>
+          <div class="grid two">
+            <label>X<input data-path="level.x" type="number" /></label>
+            <label>Y<input data-path="level.y" type="number" /></label>
+            <label>Size<input data-path="level.size" type="number" /></label>
+            <label>Color<input data-path="level.color" type="color" /></label>
+            <label class="full">Prefix<input data-path="level.prefix" type="text" /></label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Progress Bar</h2>
+          <div class="grid two">
+            <label>X<input data-path="progress.x" type="number" /></label>
+            <label>Y<input data-path="progress.y" type="number" /></label>
+            <label>Width<input data-path="progress.width" type="number" /></label>
+            <label>Height<input data-path="progress.height" type="number" /></label>
+            <label>Radius<input data-path="progress.radius" type="number" /></label>
+            <label>BG<input data-path="progress.background" type="text" /></label>
+            <label>Fill Start<input data-path="progress.fillStart" type="color" /></label>
+            <label>Fill End<input data-path="progress.fillEnd" type="color" /></label>
+            <label class="full">Border<input data-path="progress.border" type="text" /></label>
+          </div>
+        </div>
+
+        <div class="section">
+          <h2>Badge</h2>
+          <div class="grid two">
+            <label class="checkbox">
+              <input data-path="badge.enabled" type="checkbox" />
+              <span>Badge enabled</span>
+            </label>
+            <label class="full">Text<input data-path="badge.text" type="text" /></label>
+            <label>X<input data-path="badge.x" type="number" /></label>
+            <label>Y<input data-path="badge.y" type="number" /></label>
+            <label>Width<input data-path="badge.width" type="number" /></label>
+            <label>Height<input data-path="badge.height" type="number" /></label>
+            <label>Radius<input data-path="badge.radius" type="number" /></label>
+            <label>Fill<input data-path="badge.fill" type="text" /></label>
+            <label>Border<input data-path="badge.border" type="text" /></label>
+            <label>Text Size<input data-path="badge.textSize" type="number" /></label>
+            <label>Text Color<input data-path="badge.textColor" type="color" /></label>
+            <label>Text Center X<input data-path="badge.textCenterX" type="number" /></label>
+            <label>Text Center Y<input data-path="badge.textCenterY" type="number" /></label>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="workspace panel">
+      <div class="workspace-header">
+        <div>
+          <p class="eyebrow">Live Renderer</p>
+          <h2>Preview Asli EXP Card</h2>
+          <p class="muted">Semua perubahan di bawah ini langsung pakai renderer backend yang sama dengan command `exp`.</p>
+        </div>
+      </div>
+      <div class="preview-shell">
+        <div class="preview-bg">
+          <img id="previewImage" alt="EXP card preview" />
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="/exp-editor.js"></script>
+</body>
+</html>

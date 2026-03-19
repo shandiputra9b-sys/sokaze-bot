@@ -1,6 +1,10 @@
 const { AttachmentBuilder } = require("discord.js");
 const { Canvas, GlobalFonts, loadImage } = require("@napi-rs/canvas");
 const path = require("node:path");
+const {
+  getExpCardConfig,
+  normalizeExpCardConfig
+} = require("../../services/expCardConfigStore");
 
 const assetsDirectory = path.join(__dirname, "..", "..", "..", "assets");
 const customFontPath = path.join(assetsDirectory, "font.otf");
@@ -27,7 +31,7 @@ function getFontFamily(weight = "regular") {
     return "Segoe UI";
   }
 
-  return "serif";
+  return "sans-serif";
 }
 
 function drawRoundedRect(context, x, y, width, height, radius) {
@@ -84,283 +88,147 @@ async function loadAvatarImage(member) {
   return loadRemoteImage(avatarUrl);
 }
 
-function drawBackground(context, width, height) {
-  const base = context.createLinearGradient(0, 0, width, height);
-  base.addColorStop(0, "#08050a");
-  base.addColorStop(0.45, "#12070d");
-  base.addColorStop(1, "#040305");
-  context.fillStyle = base;
-  context.fillRect(0, 0, width, height);
+function drawBackground(context, width, height, config) {
+  const gradient = context.createLinearGradient(0, 0, width, height);
+  gradient.addColorStop(0, config.background.baseStart);
+  gradient.addColorStop(1, config.background.baseEnd);
+  context.fillStyle = gradient;
+  drawRoundedRect(context, 0, 0, width, height, config.borderRadius);
+  context.fill();
 
   context.save();
-  context.filter = "blur(88px)";
-
-  const redAura = context.createRadialGradient(180, 120, 25, 180, 120, 260);
-  redAura.addColorStop(0, "rgba(142, 28, 49, 0.5)");
-  redAura.addColorStop(1, "rgba(0, 0, 0, 0)");
-  context.fillStyle = redAura;
-  context.fillRect(-80, -60, 480, 360);
-
-  const goldAura = context.createRadialGradient(width - 180, height - 120, 30, width - 180, height - 120, 280);
-  goldAura.addColorStop(0, "rgba(232, 191, 122, 0.34)");
-  goldAura.addColorStop(1, "rgba(0, 0, 0, 0)");
-  context.fillStyle = goldAura;
-  context.fillRect(width - 460, height - 360, 500, 380);
+  context.filter = "blur(34px)";
+  const glow = context.createRadialGradient(width - 120, height / 2, 12, width - 120, height / 2, 180);
+  glow.addColorStop(0, config.background.accentGlow);
+  glow.addColorStop(1, "rgba(0,0,0,0)");
+  context.fillStyle = glow;
+  context.fillRect(width - 280, -30, 320, height + 60);
   context.restore();
 
-  context.strokeStyle = "rgba(255, 255, 255, 0.05)";
+  context.strokeStyle = config.background.border;
   context.lineWidth = 1;
-  drawRoundedRect(context, 22, 22, width - 44, height - 44, 32);
+  drawRoundedRect(context, 0.5, 0.5, width - 1, height - 1, config.borderRadius);
   context.stroke();
 }
 
-function drawShell(context, width, height) {
-  context.fillStyle = "rgba(12, 9, 14, 0.82)";
-  drawRoundedRect(context, 34, 34, width - 68, height - 68, 28);
-  context.fill();
-
-  context.strokeStyle = "rgba(255, 255, 255, 0.08)";
-  context.lineWidth = 1;
-  drawRoundedRect(context, 34, 34, width - 68, height - 68, 28);
-  context.stroke();
-
-  context.fillStyle = "#c89c63";
-  drawRoundedRect(context, 54, 54, 6, height - 108, 3);
-  context.fill();
-}
-
-function drawPanel(context, x, y, width, height) {
-  context.fillStyle = "rgba(255, 255, 255, 0.035)";
-  drawRoundedRect(context, x, y, width, height, 24);
-  context.fill();
-
-  context.strokeStyle = "rgba(255, 255, 255, 0.08)";
-  context.lineWidth = 1;
-  drawRoundedRect(context, x, y, width, height, 24);
-  context.stroke();
-}
-
-function drawAvatar(context, avatar, member) {
-  const x = 76;
-  const y = 78;
-  const size = 122;
-  const centerX = x + (size / 2);
-  const centerY = y + (size / 2);
+function drawAvatar(context, avatar, member, config) {
+  const x = config.avatar.x;
+  const y = config.avatar.y;
+  const size = config.avatar.size;
 
   context.save();
-  context.beginPath();
-  context.arc(centerX, centerY, size / 2, 0, Math.PI * 2);
-  context.closePath();
+  drawRoundedRect(context, x, y, size, size, config.avatar.radius);
   context.clip();
 
   if (avatar) {
     context.drawImage(avatar, x, y, size, size);
   } else {
     const fallback = context.createLinearGradient(x, y, x + size, y + size);
-    fallback.addColorStop(0, "#31111a");
-    fallback.addColorStop(1, "#14080d");
+    fallback.addColorStop(0, "#4a4f55");
+    fallback.addColorStop(1, "#262a2f");
     context.fillStyle = fallback;
     context.fillRect(x, y, size, size);
-    context.fillStyle = "#fff8ef";
+    context.fillStyle = "#f4f7fb";
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.font = `bold 52px "${getFontFamily("bold")}"`;
-    context.fillText((member.displayName || member.user.username).charAt(0).toUpperCase(), centerX, centerY + 2);
+    context.font = `bold ${Math.round(size * 0.44)}px "${getFontFamily("bold")}"`;
+    context.fillText((member.displayName || member.user.username).charAt(0).toUpperCase(), x + (size / 2), y + (size / 2));
     context.textAlign = "start";
     context.textBaseline = "alphabetic";
   }
 
   context.restore();
-
-  const ring = context.createLinearGradient(x, y, x + size, y + size);
-  ring.addColorStop(0, "#f5d0a8");
-  ring.addColorStop(1, "#8e1f33");
-  context.strokeStyle = ring;
-  context.lineWidth = 4;
-  context.beginPath();
-  context.arc(centerX, centerY, (size / 2) - 2, 0, Math.PI * 2);
-  context.stroke();
 }
 
-function drawHeader(context, member, levelInfo) {
-  context.fillStyle = "#d5b792";
-  context.font = `bold 20px "${getFontFamily("bold")}"`;
-  context.fillText("SOKAZE EXP CHRONICLE", 238, 84);
+function drawTexts(context, member, levelInfo, config) {
+  context.fillStyle = config.username.color;
+  context.font = `bold ${config.username.size}px "${getFontFamily("bold")}"`;
+  context.textAlign = "start";
+  context.fillText(
+    fitText(context, member.displayName || member.user.username, config.progress.x - config.username.x - 18),
+    config.username.x,
+    config.username.y
+  );
 
-  context.fillStyle = "#fff7ef";
-  context.font = `bold 46px "${getFontFamily("bold")}"`;
-  context.fillText("EXPERIENCE", 238, 136);
+  context.fillStyle = config.xp.color;
+  context.font = `${config.xp.size}px "${getFontFamily()}"`;
+  context.textAlign = "right";
+  context.fillText(`${formatNumber(levelInfo.xp)} ${config.xp.suffix}`, config.xp.textX, config.xp.y);
 
-  context.fillStyle = "#f3d8bf";
-  context.font = `bold 33px "${getFontFamily("bold")}"`;
-  context.fillText(fitText(context, member.displayName || member.user.username, 470), 238, 184);
+  context.fillStyle = config.level.color;
+  context.font = `${config.level.size}px "${getFontFamily()}"`;
+  context.textAlign = "start";
+  context.fillText(`${config.level.prefix} ${levelInfo.level}`, config.level.x, config.level.y);
+}
 
-  context.fillStyle = "#b69f8e";
-  context.font = `17px "${getFontFamily()}"`;
-  context.fillText(`@${fitText(context, member.user.username, 260)}`, 238, 214);
+function drawBadge(context, config) {
+  if (!config.badge?.enabled) {
+    return;
+  }
 
-  context.fillStyle = "rgba(255, 236, 215, 0.08)";
-  drawRoundedRect(context, 760, 72, 134, 44, 18);
+  context.fillStyle = config.badge.fill;
+  drawRoundedRect(context, config.badge.x, config.badge.y, config.badge.width, config.badge.height, config.badge.radius);
   context.fill();
-  context.strokeStyle = "rgba(255, 255, 255, 0.08)";
-  drawRoundedRect(context, 760, 72, 134, 44, 18);
+
+  context.strokeStyle = config.badge.border;
+  context.lineWidth = 1;
+  drawRoundedRect(context, config.badge.x, config.badge.y, config.badge.width, config.badge.height, config.badge.radius);
   context.stroke();
 
-  context.fillStyle = "#fff5eb";
-  context.font = `bold 18px "${getFontFamily("bold")}"`;
+  context.fillStyle = config.badge.textColor;
+  context.font = `bold ${config.badge.textSize}px "${getFontFamily("bold")}"`;
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(`${levelInfo.code} ${levelInfo.name}`, 827, 94);
+  context.fillText(config.badge.text, config.badge.textCenterX, config.badge.textCenterY);
   context.textAlign = "start";
   context.textBaseline = "alphabetic";
+}
 
-  context.strokeStyle = "rgba(255, 255, 255, 0.08)";
+function drawProgress(context, levelInfo, config) {
+  const x = config.progress.x;
+  const y = config.progress.y;
+  const width = config.progress.width;
+  const height = config.progress.height;
+  const fillWidth = levelInfo.level >= 5
+    ? width
+    : Math.max(0, Math.round(width * Math.max(0, Math.min(1, levelInfo.progressRatio))));
+
+  context.fillStyle = config.progress.background;
+  drawRoundedRect(context, x, y, width, height, config.progress.radius);
+  context.fill();
+
+  if (fillWidth > 0) {
+    const fill = context.createLinearGradient(x, y, x + width, y);
+    fill.addColorStop(0, config.progress.fillStart);
+    fill.addColorStop(1, config.progress.fillEnd);
+    context.fillStyle = fill;
+    drawRoundedRect(context, x, y, fillWidth, height, config.progress.radius);
+    context.fill();
+  }
+
+  context.strokeStyle = config.progress.border;
   context.lineWidth = 1;
-  context.beginPath();
-  context.moveTo(238, 244);
-  context.lineTo(894, 244);
+  drawRoundedRect(context, x, y, width, height, config.progress.radius);
   context.stroke();
 }
 
-function drawMetric(context, x, y, width, label, value, caption) {
-  drawPanel(context, x, y, width, 108);
-
-  context.fillStyle = "#b8a092";
-  context.font = `bold 15px "${getFontFamily("bold")}"`;
-  context.fillText(label, x + 20, y + 28);
-
-  context.fillStyle = "#fff7ef";
-  context.font = `bold 30px "${getFontFamily("bold")}"`;
-  context.fillText(value, x + 20, y + 68);
-
-  context.fillStyle = "#cab8ac";
-  context.font = `15px "${getFontFamily()}"`;
-  context.fillText(caption, x + 20, y + 90);
-}
-
-function drawProgressPanel(context, levelInfo) {
-  const panelX = 74;
-  const panelY = 276;
-  const panelWidth = 820;
-  const panelHeight = 170;
-  const barX = panelX + 28;
-  const barY = panelY + 92;
-  const barWidth = panelWidth - 56;
-  const barHeight = 28;
-
-  drawPanel(context, panelX, panelY, panelWidth, panelHeight);
-
-  context.fillStyle = "#d5b792";
-  context.font = `bold 18px "${getFontFamily("bold")}"`;
-  context.fillText("XP PROGRESSION", panelX + 28, panelY + 34);
-
-  context.fillStyle = "#fff7ef";
-  context.font = `bold 28px "${getFontFamily("bold")}"`;
-  context.fillText(
-    levelInfo.level >= 5
-      ? `${formatNumber(levelInfo.xp)} XP`
-      : `${formatNumber(levelInfo.xp)} / ${formatNumber(levelInfo.nextThreshold)} XP`,
-    panelX + 28,
-    panelY + 70
-  );
-
-  context.fillStyle = "rgba(255, 255, 255, 0.05)";
-  drawRoundedRect(context, barX, barY, barWidth, barHeight, 14);
-  context.fill();
-
-  const rawFillWidth = Math.round(barWidth * levelInfo.progressRatio);
-  const fillWidth = levelInfo.progressRatio <= 0
-    ? 0
-    : Math.max(18, rawFillWidth);
-  const progressGradient = context.createLinearGradient(barX, barY, barX + barWidth, barY);
-  progressGradient.addColorStop(0, "#f4d19f");
-  progressGradient.addColorStop(0.6, "#d69a64");
-  progressGradient.addColorStop(1, "#8e1f33");
-  context.fillStyle = levelInfo.level >= 5 ? "#f0c98e" : progressGradient;
-  drawRoundedRect(context, barX, barY, levelInfo.level >= 5 ? barWidth : fillWidth, barHeight, 14);
-  context.fill();
-
-  context.strokeStyle = "rgba(255, 255, 255, 0.09)";
-  context.lineWidth = 1;
-  drawRoundedRect(context, barX, barY, barWidth, barHeight, 14);
-  context.stroke();
-
-  context.fillStyle = "#cab8ac";
-  context.font = `16px "${getFontFamily()}"`;
-  context.fillText(
-    levelInfo.level >= 5
-      ? "Kamu sudah mencapai tier tertinggi Sokaze."
-      : `Sisa ${formatNumber(levelInfo.remainingXp)} XP lagi menuju ${levelInfo.level + 1}.`,
-    panelX + 28,
-    panelY + 140
-  );
-
-  context.textAlign = "right";
-  context.fillStyle = "#fff0df";
-  context.font = `bold 16px "${getFontFamily("bold")}"`;
-  context.fillText(
-    levelInfo.level >= 5 ? "MAX TIER" : `${Math.round(levelInfo.progressRatio * 100)}%`,
-    panelX + panelWidth - 28,
-    panelY + 34
-  );
-  context.textAlign = "start";
-}
-
-function drawFooter(context, levelInfo) {
-  const tierLabel = `${levelInfo.code} ${levelInfo.name}`;
-  const lowerProgress = formatNumber(levelInfo.currentThreshold);
-  const upperProgress = levelInfo.level >= 5 ? "MAX" : formatNumber(levelInfo.nextThreshold);
-
-  context.fillStyle = "#8f7a72";
-  context.font = `15px "${getFontFamily()}"`;
-  context.fillText(`Tier saat ini: ${tierLabel}`, 76, 514);
-  context.textAlign = "right";
-  context.fillText(`Range XP: ${lowerProgress} -> ${upperProgress}`, 894, 514);
-  context.textAlign = "start";
-}
-
-async function createExpCard(member, levelInfo) {
-  const width = 968;
-  const height = 560;
-  const canvas = new Canvas(width, height);
+async function createExpCard(member, levelInfo, configOverride = null) {
+  const config = configOverride
+    ? normalizeExpCardConfig(configOverride)
+    : getExpCardConfig();
+  const canvas = new Canvas(config.width, config.height);
   const context = canvas.getContext("2d");
   const avatar = await loadAvatarImage(member).catch(() => null);
 
-  drawBackground(context, width, height);
-  drawShell(context, width, height);
-  drawAvatar(context, avatar, member);
-  drawHeader(context, member, levelInfo);
-
-  drawMetric(context, 74, 462 - 82, 188, "CURRENT LEVEL", String(levelInfo.level), tierLabel(levelInfo));
-  drawMetric(
-    context,
-    282,
-    462 - 82,
-    250,
-    "TOTAL XP",
-    formatNumber(levelInfo.xp),
-    levelInfo.level >= 5 ? "Puncak progression tercapai" : "Akumulasi loyalitas aktif"
-  );
-  drawMetric(
-    context,
-    552,
-    462 - 82,
-    342,
-    "NEXT TARGET",
-    levelInfo.level >= 5 ? "MAX TIER" : `${formatNumber(levelInfo.remainingXp)} XP`,
-    levelInfo.level >= 5 ? "Tidak ada tier setelah ini" : `Menuju L${levelInfo.level + 1}`
-  );
-
-  drawProgressPanel(context, levelInfo);
-  drawFooter(context, levelInfo);
+  drawBackground(context, config.width, config.height, config);
+  drawAvatar(context, avatar, member, config);
+  drawTexts(context, member, levelInfo, config);
+  drawBadge(context, config);
+  drawProgress(context, levelInfo, config);
 
   return new AttachmentBuilder(await canvas.encode("png"), {
     name: "sokaze-exp-card.png"
   });
-}
-
-function tierLabel(levelInfo) {
-  return `${levelInfo.code} ${levelInfo.name}`;
 }
 
 module.exports = {

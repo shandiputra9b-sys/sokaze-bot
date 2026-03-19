@@ -24,6 +24,22 @@ const {
   normalizeBuilderPayload,
   sendBuilderMessage
 } = require("../modules/embed-builder/embedBuilderSystem");
+const { createExpCard } = require("../modules/levels/expCard");
+const { createLevelUpCard } = require("../modules/levels/levelUpCard");
+const {
+  DEFAULT_EXP_CARD_CONFIG,
+  getExpCardConfig,
+  normalizeExpCardConfig,
+  resetExpCardConfig,
+  saveExpCardConfig
+} = require("../services/expCardConfigStore");
+const {
+  DEFAULT_LEVEL_UP_CARD_CONFIG,
+  getLevelUpCardConfig,
+  normalizeLevelUpCardConfig,
+  resetLevelUpCardConfig,
+  saveLevelUpCardConfig
+} = require("../services/levelUpCardConfigStore");
 
 const SESSION_COOKIE_NAME = "sokaze_embed_session";
 const sessions = new Map();
@@ -135,6 +151,32 @@ function requireAuth(request, response, serverConfig) {
   return false;
 }
 
+function isLocalEditorRequest(request) {
+  const remoteAddress = String(
+    request.socket?.remoteAddress
+    || request.connection?.remoteAddress
+    || ""
+  ).trim();
+
+  return [
+    "127.0.0.1",
+    "::1",
+    "::ffff:127.0.0.1"
+  ].includes(remoteAddress);
+}
+
+function requireLocalEditorAccess(request, response) {
+  if (isLocalEditorRequest(request)) {
+    return true;
+  }
+
+  sendJson(response, 404, {
+    ok: false,
+    error: "Not found"
+  });
+  return false;
+}
+
 function mapTemplatesForResponse() {
   return listTemplates().map((template) => ({
     id: template.id,
@@ -151,7 +193,74 @@ function getStaticPaths() {
   return {
     html: path.join(root, "tools", "embed-builder.html"),
     css: path.join(root, "tools", "embed-builder.css"),
-    js: path.join(root, "tools", "embed-builder.js")
+    js: path.join(root, "tools", "embed-builder.js"),
+    expEditorHtml: path.join(root, "tools", "exp-editor.html"),
+    expEditorCss: path.join(root, "tools", "exp-editor.css"),
+    expEditorJs: path.join(root, "tools", "exp-editor.js"),
+    levelUpEditorHtml: path.join(root, "tools", "levelup-editor.html"),
+    levelUpEditorCss: path.join(root, "tools", "levelup-editor.css"),
+    levelUpEditorJs: path.join(root, "tools", "levelup-editor.js")
+  };
+}
+
+function buildExpEditorSample(payload = {}) {
+  const displayName = String(payload.name || "neoniyann").trim() || "neoniyann";
+  const level = Math.max(1, Number.parseInt(String(payload.level || 9), 10) || 9);
+  const xp = Math.max(0, Number.parseInt(String(payload.xp || 475), 10) || 475);
+  const nextThresholdBase = Math.max(level + 1, Number.parseInt(String(payload.nextThreshold || Math.max(600, xp + 50)), 10) || Math.max(600, xp + 50));
+  const currentThreshold = level <= 1 ? 0 : Math.max(0, Math.floor(nextThresholdBase * 0.55));
+  const clampedXp = Math.min(nextThresholdBase, Math.max(currentThreshold, xp));
+  const remainingXp = Math.max(0, nextThresholdBase - clampedXp);
+  const divisor = Math.max(1, nextThresholdBase - currentThreshold);
+  const progressRatio = level >= 5 ? 1 : Math.max(0, Math.min(1, (clampedXp - currentThreshold) / divisor));
+  const avatarUrl = String(payload.avatarUrl || "").trim() || "https://cdn.discordapp.com/embed/avatars/0.png";
+
+  return {
+    member: {
+      displayName,
+      user: {
+        username: displayName.toLowerCase().replace(/\s+/g, ""),
+        displayAvatarURL() {
+          return avatarUrl;
+        }
+      }
+    },
+    levelInfo: {
+      level,
+      xp: clampedXp,
+      currentThreshold,
+      nextThreshold: nextThresholdBase,
+      remainingXp,
+      progressRatio
+    }
+  };
+}
+
+function buildLevelUpEditorSample(payload = {}) {
+  const previousLevel = Math.max(0, Number.parseInt(String(payload.previousLevel || 66), 10) || 66);
+  const nextLevel = Math.max(previousLevel + 1, Number.parseInt(String(payload.nextLevel || previousLevel + 1), 10) || previousLevel + 1);
+  const avatarUrl = String(payload.avatarUrl || "").trim() || "https://cdn.discordapp.com/embed/avatars/0.png";
+
+  return {
+    member: {
+      displayName: "lilputrxx666",
+      user: {
+        username: "putrxx",
+        displayAvatarURL() {
+          return avatarUrl;
+        }
+      }
+    },
+    previousLevelInfo: {
+      level: previousLevel,
+      code: `L${previousLevel}`,
+      name: "Core"
+    },
+    nextLevelInfo: {
+      level: nextLevel,
+      code: `L${nextLevel}`,
+      name: "Elite"
+    }
   };
 }
 
@@ -313,6 +422,106 @@ async function handleChannels(response, client, refresh = false) {
   });
 }
 
+function handleLevelUpEditorBootstrap(response) {
+  sendJson(response, 200, {
+    ok: true,
+    config: getLevelUpCardConfig(),
+    defaults: normalizeLevelUpCardConfig(DEFAULT_LEVEL_UP_CARD_CONFIG)
+  });
+}
+
+function handleExpEditorBootstrap(response) {
+  sendJson(response, 200, {
+    ok: true,
+    config: getExpCardConfig(),
+    defaults: normalizeExpCardConfig(DEFAULT_EXP_CARD_CONFIG)
+  });
+}
+
+async function handleExpEditorPreview(request, response) {
+  const payload = await readJsonBody(request);
+  const config = normalizeExpCardConfig(payload.config || {});
+  const sample = buildExpEditorSample(payload.sample || {});
+  const card = await createExpCard(sample.member, sample.levelInfo, config);
+  const buffer = Buffer.isBuffer(card.attachment) ? card.attachment : Buffer.from(card.attachment);
+
+  response.writeHead(200, {
+    "Content-Type": "image/png",
+    "Cache-Control": "no-store"
+  });
+  response.end(buffer);
+}
+
+async function handleExpEditorSave(request, response) {
+  const payload = await readJsonBody(request);
+  const config = saveExpCardConfig(payload.config || {});
+
+  appendAuditEntry({
+    action: "exp-editor-save",
+    detail: `${config.width}x${config.height}`
+  });
+
+  sendJson(response, 200, {
+    ok: true,
+    config
+  });
+}
+
+function handleExpEditorReset(response) {
+  const config = resetExpCardConfig();
+
+  appendAuditEntry({
+    action: "exp-editor-reset"
+  });
+
+  sendJson(response, 200, {
+    ok: true,
+    config
+  });
+}
+
+async function handleLevelUpEditorPreview(request, response) {
+  const payload = await readJsonBody(request);
+  const config = normalizeLevelUpCardConfig(payload.config || {});
+  const sample = buildLevelUpEditorSample(payload.sample || {});
+  const card = await createLevelUpCard(sample.member, sample.previousLevelInfo, sample.nextLevelInfo, config);
+  const buffer = Buffer.isBuffer(card.attachment) ? card.attachment : Buffer.from(card.attachment);
+
+  response.writeHead(200, {
+    "Content-Type": "image/png",
+    "Cache-Control": "no-store"
+  });
+  response.end(buffer);
+}
+
+async function handleLevelUpEditorSave(request, response) {
+  const payload = await readJsonBody(request);
+  const config = saveLevelUpCardConfig(payload.config || {});
+
+  appendAuditEntry({
+    action: "levelup-editor-save",
+    detail: `${config.width}x${config.height}`
+  });
+
+  sendJson(response, 200, {
+    ok: true,
+    config
+  });
+}
+
+function handleLevelUpEditorReset(response) {
+  const config = resetLevelUpCardConfig();
+
+  appendAuditEntry({
+    action: "levelup-editor-reset"
+  });
+
+  sendJson(response, 200, {
+    ok: true,
+    config
+  });
+}
+
 async function handleFetchMessage(request, response, client) {
   const payload = await readJsonBody(request);
   const result = await fetchBuilderMessage(client, payload.payload || payload);
@@ -389,6 +598,72 @@ function startEmbedBuilderServer(client) {
         });
       }
 
+      if (request.method === "GET" && url.pathname === "/exp-editor") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        const html = await readStaticAsset(staticPaths.expEditorHtml);
+        return sendText(response, 200, html, "text/html; charset=utf-8", {
+          "Cache-Control": "no-store"
+        });
+      }
+
+      if (request.method === "GET" && url.pathname === "/exp-editor.css") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        const css = await readStaticAsset(staticPaths.expEditorCss);
+        return sendText(response, 200, css, "text/css; charset=utf-8", {
+          "Cache-Control": "public, max-age=60"
+        });
+      }
+
+      if (request.method === "GET" && url.pathname === "/exp-editor.js") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        const js = await readStaticAsset(staticPaths.expEditorJs);
+        return sendText(response, 200, js, "application/javascript; charset=utf-8", {
+          "Cache-Control": "public, max-age=60"
+        });
+      }
+
+      if (request.method === "GET" && url.pathname === "/levelup-editor") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        const html = await readStaticAsset(staticPaths.levelUpEditorHtml);
+        return sendText(response, 200, html, "text/html; charset=utf-8", {
+          "Cache-Control": "no-store"
+        });
+      }
+
+      if (request.method === "GET" && url.pathname === "/levelup-editor.css") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        const css = await readStaticAsset(staticPaths.levelUpEditorCss);
+        return sendText(response, 200, css, "text/css; charset=utf-8", {
+          "Cache-Control": "public, max-age=60"
+        });
+      }
+
+      if (request.method === "GET" && url.pathname === "/levelup-editor.js") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        const js = await readStaticAsset(staticPaths.levelUpEditorJs);
+        return sendText(response, 200, js, "application/javascript; charset=utf-8", {
+          "Cache-Control": "public, max-age=60"
+        });
+      }
+
       if (request.method === "POST" && url.pathname === "/api/embed-builder/login") {
         return handleLogin(request, response, serverConfig);
       }
@@ -415,6 +690,70 @@ function startEmbedBuilderServer(client) {
 
       if (!requireAuth(request, response, serverConfig)) {
         return;
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/exp-editor/bootstrap") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        return handleExpEditorBootstrap(response);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/exp-editor/preview") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        return handleExpEditorPreview(request, response);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/exp-editor/config") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        return handleExpEditorSave(request, response);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/exp-editor/reset") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        return handleExpEditorReset(response);
+      }
+
+      if (request.method === "GET" && url.pathname === "/api/levelup-editor/bootstrap") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        return handleLevelUpEditorBootstrap(response);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/levelup-editor/preview") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        return handleLevelUpEditorPreview(request, response);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/levelup-editor/config") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        return handleLevelUpEditorSave(request, response);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/levelup-editor/reset") {
+        if (!requireLocalEditorAccess(request, response)) {
+          return;
+        }
+
+        return handleLevelUpEditorReset(response);
       }
 
       if (request.method === "GET" && url.pathname === "/api/embed-builder/bootstrap") {
