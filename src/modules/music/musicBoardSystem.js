@@ -77,13 +77,43 @@ function buildBoardEntryLine(entry) {
   const commandPart = entry.commandHint ? ` \`${entry.commandHint}\`` : "";
   const statusText = entry.voiceChannel ? entry.voiceChannel.toString() : "Tersedia";
 
-  return `${entry.statusIcon} **${entry.label}**${commandPart}\n${entry.mention} • ${statusText}`;
+  return `${entry.statusIcon} **${entry.label}**${commandPart}\n${entry.mention} - ${statusText}`;
 }
 
-function buildMusicBoardSummaryEmbed(guild, entries) {
+function buildSectionFields(entries, options) {
+  const chunks = chunkEntries(entries, MUSIC_BOARD_PAGE_SIZE);
+
+  if (chunks.length === 0) {
+    return [
+      {
+        name: options.title,
+        value: options.emptyMessage,
+        inline: false
+      }
+    ];
+  }
+
+  return chunks.map((chunk, index) => ({
+    name: chunks.length > 1 ? `${options.title} (${index + 1}/${chunks.length})` : options.title,
+    value: chunk.map(buildBoardEntryLine).join("\n\n"),
+    inline: false
+  }));
+}
+
+function buildMusicBoardEmbed(guild, entries) {
   const guildIconUrl = getGuildIconUrl(guild) || undefined;
-  const availableCount = entries.filter((entry) => !entry.voiceChannel).length;
-  const busyCount = entries.length - availableCount;
+  const availableEntries = entries.filter((entry) => !entry.voiceChannel);
+  const busyEntries = entries.filter((entry) => entry.voiceChannel);
+  const fields = [
+    ...buildSectionFields(availableEntries, {
+      title: `${AVAILABLE_ICON} Music Bot Tersedia`,
+      emptyMessage: "Semua music bot sedang dipakai sekarang."
+    }),
+    ...buildSectionFields(busyEntries, {
+      title: `${BUSY_ICON} Music Bot Sedang Dipakai`,
+      emptyMessage: "Tidak ada music bot yang sedang dipakai."
+    })
+  ];
 
   return new EmbedBuilder()
     .setColor("#22c55e")
@@ -92,60 +122,17 @@ function buildMusicBoardSummaryEmbed(guild, entries) {
       iconURL: guildIconUrl
     })
     .setDescription([
-      `${AVAILABLE_ICON} **Tersedia:** ${availableCount}`,
-      `${BUSY_ICON} **Sedang Dipakai:** ${busyCount}`,
+      `${AVAILABLE_ICON} **Tersedia:** ${availableEntries.length}`,
+      `${BUSY_ICON} **Sedang Dipakai:** ${busyEntries.length}`,
       "",
       "Status akan update otomatis saat music bot masuk, pindah, atau keluar dari voice."
     ].join("\n"))
+    .addFields(fields)
     .setFooter({
       text: "Sokaze Assistant | Music board auto update",
       iconURL: guildIconUrl
     })
     .setTimestamp();
-}
-
-function buildMusicBoardSectionEmbeds(guild, entries, options) {
-  const guildIconUrl = getGuildIconUrl(guild) || undefined;
-  const chunks = chunkEntries(entries, MUSIC_BOARD_PAGE_SIZE);
-
-  if (chunks.length === 0) {
-    return [
-      new EmbedBuilder()
-        .setColor(options.color)
-        .setAuthor({
-          name: options.title,
-          iconURL: guildIconUrl
-        })
-        .setDescription(options.emptyMessage)
-    ];
-  }
-
-  return chunks.map((chunk, index) => new EmbedBuilder()
-    .setColor(options.color)
-    .setAuthor({
-      name: chunks.length > 1 ? `${options.title} (${index + 1}/${chunks.length})` : options.title,
-      iconURL: guildIconUrl
-    })
-    .setDescription(chunk.map(buildBoardEntryLine).join("\n\n")));
-}
-
-function buildMusicBoardEmbeds(guild, entries) {
-  const availableEntries = entries.filter((entry) => !entry.voiceChannel);
-  const busyEntries = entries.filter((entry) => entry.voiceChannel);
-
-  return [
-    buildMusicBoardSummaryEmbed(guild, entries),
-    ...buildMusicBoardSectionEmbeds(guild, availableEntries, {
-      title: `${AVAILABLE_ICON} Music Bot Tersedia`,
-      color: "#22c55e",
-      emptyMessage: "Semua music bot sedang dipakai sekarang."
-    }),
-    ...buildMusicBoardSectionEmbeds(guild, busyEntries, {
-      title: `${BUSY_ICON} Music Bot Sedang Dipakai`,
-      color: "#ef4444",
-      emptyMessage: "Tidak ada music bot yang sedang dipakai."
-    })
-  ];
 }
 
 async function buildMusicBoardEntries(guild) {
@@ -192,7 +179,7 @@ async function refreshMusicBoardForGuild(guild, options = {}) {
 
     const entries = await buildMusicBoardEntries(guild);
     const payload = {
-      embeds: buildMusicBoardEmbeds(guild, entries)
+      embeds: [buildMusicBoardEmbed(guild, entries)]
     };
 
     if (boardMessage) {
