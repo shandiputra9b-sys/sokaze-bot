@@ -10,7 +10,7 @@ const DEFAULT_MUSIC_BOARD_SETTINGS = {
 
 const AVAILABLE_ICON = "\u{1F7E2}";
 const BUSY_ICON = "\u{1F534}";
-const MUSIC_BOARD_PAGE_SIZE = 5;
+const MUSIC_BOARD_PAGE_SIZE = 7;
 const musicBoardRefreshes = new Map();
 
 function getMusicBoardSettings(guildId) {
@@ -94,7 +94,7 @@ function buildSectionFields(entries, options) {
   }
 
   return chunks.map((chunk, index) => ({
-    name: options.title,
+    name: index === 0 ? options.title : "\u200b",
     value: chunk.map(buildBoardEntryLine).join("\n\n"),
     inline: false
   }));
@@ -106,11 +106,11 @@ function buildMusicBoardEmbed(guild, entries) {
   const busyEntries = entries.filter((entry) => entry.voiceChannel);
   const fields = [
     ...buildSectionFields(availableEntries, {
-      title: `${AVAILABLE_ICON} Music Bot Tersedia`,
+      title: `${AVAILABLE_ICON} Tersedia`,
       emptyMessage: "Semua music bot sedang dipakai sekarang."
     }),
     ...buildSectionFields(busyEntries, {
-      title: `${BUSY_ICON} Music Bot Sedang Dipakai`,
+      title: `${BUSY_ICON} Dipakai`,
       emptyMessage: "Tidak ada music bot yang sedang dipakai."
     })
   ];
