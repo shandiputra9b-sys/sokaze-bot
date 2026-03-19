@@ -21,6 +21,7 @@ const SUGGESTION_PANEL_BUTTON_ID = "suggestion:create";
 const SUGGESTION_MODAL_ID = "suggestion:modal";
 const SUGGESTION_VOTE_PREFIX = "suggestion:vote:";
 const SUGGESTION_STATUS_PREFIX = "suggestion:status:";
+const SUGGESTION_UPVOTE_REACTION = "emoji_26:1482708296447037542";
 
 const DEFAULT_SUGGESTION_SETTINGS = {
   channelId: "",
@@ -98,30 +99,13 @@ function getGuildIconUrl(guild) {
   }) || null;
 }
 
-function getVoteTotals(suggestion) {
-  const votes = Object.values(suggestion.votes || {});
-  const upvotes = votes.filter((vote) => vote === "up").length;
-  const downvotes = votes.filter((vote) => vote === "down").length;
-
-  return {
-    upvotes,
-    downvotes,
-    score: upvotes - downvotes
-  };
-}
-
-function buildVoteSummary(suggestion) {
-  const totals = getVoteTotals(suggestion);
-  return `⬆ ${totals.upvotes} • ⬇ ${totals.downvotes} • Score ${totals.score}`;
-}
-
 function buildSuggestionPanelButtonRow() {
   return [
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId(SUGGESTION_PANEL_BUTTON_ID)
-        .setLabel("Kirim Saran")
-        .setStyle(ButtonStyle.Primary)
+        .setLabel("Kirim Saran mu")
+        .setStyle(ButtonStyle.Secondary)
     )
   ];
 }
@@ -195,51 +179,32 @@ function buildSuggestionModal() {
 }
 
 function buildSuggestionActionRows(suggestion) {
-  const totals = getVoteTotals(suggestion);
-
   return [
     new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId(`${SUGGESTION_VOTE_PREFIX}up:${suggestion.id}`)
-        .setLabel(`Upvote ${totals.upvotes}`)
-        .setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder()
-        .setCustomId(`${SUGGESTION_VOTE_PREFIX}down:${suggestion.id}`)
-        .setLabel(`Downvote ${totals.downvotes}`)
+        .setCustomId(SUGGESTION_PANEL_BUTTON_ID)
+        .setLabel("Kirim Saran mu")
         .setStyle(ButtonStyle.Secondary)
-    ),
-    new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId(`${SUGGESTION_STATUS_PREFIX}under_review:${suggestion.id}`)
-        .setLabel("Under Review")
-        .setStyle(ButtonStyle.Secondary),
-      new ButtonBuilder()
-        .setCustomId(`${SUGGESTION_STATUS_PREFIX}accepted:${suggestion.id}`)
-        .setLabel("Accepted")
-        .setStyle(ButtonStyle.Success),
-      new ButtonBuilder()
-        .setCustomId(`${SUGGESTION_STATUS_PREFIX}rejected:${suggestion.id}`)
-        .setLabel("Rejected")
-        .setStyle(ButtonStyle.Danger),
-      new ButtonBuilder()
-        .setCustomId(`${SUGGESTION_STATUS_PREFIX}implemented:${suggestion.id}`)
-        .setLabel("Implemented")
-        .setStyle(ButtonStyle.Primary)
     )
   ];
 }
 
 function buildSuggestionEmbed(guild, suggestion) {
-  const iconURL = getGuildIconUrl(guild) || undefined;
   const status = suggestion.status || "pending";
   const embed = new EmbedBuilder()
     .setColor(SUGGESTION_STATUS_COLORS[status] || SUGGESTION_STATUS_COLORS.pending)
-    .setAuthor({
-      name: "Sokaze Suggestions",
-      iconURL
-    })
-    .setTitle(`Suggestion #${suggestion.publicId}`)
-    .setDescription(`**${suggestion.title}**`)
+    .setTitle("Saran Baru!!")
+    .setDescription([
+      `💡 **Saran dari:**`,
+      `${suggestion.authorName} (${suggestion.authorMention})`,
+      "",
+      `📝 **Sarannya adalah:**`,
+      suggestion.content,
+      "",
+      `✨ **Manfaat / alasan:**`,
+      suggestion.benefit
+    ].join("\n"))
+    .setThumbnail(suggestion.authorAvatarUrl || null)
     .addFields(
       {
         name: "Kategori",
@@ -247,44 +212,15 @@ function buildSuggestionEmbed(guild, suggestion) {
         inline: true
       },
       {
-        name: "Status",
-        value: SUGGESTION_STATUS_LABELS[status] || SUGGESTION_STATUS_LABELS.pending,
+        name: "Judul",
+        value: suggestion.title,
         inline: true
-      },
-      {
-        name: "Votes",
-        value: buildVoteSummary(suggestion),
-        inline: true
-      },
-      {
-        name: "Dari",
-        value: `<@${suggestion.authorId}>`,
-        inline: true
-      },
-      {
-        name: "Isi Saran",
-        value: suggestion.content,
-        inline: false
-      },
-      {
-        name: "Manfaat",
-        value: suggestion.benefit,
-        inline: false
       }
     )
     .setFooter({
-      text: "Sokaze Suggestion System",
-      iconURL
+      text: `${guild.name} • ${new Date(suggestion.updatedAt || suggestion.createdAt || Date.now()).toLocaleString("id-ID")}`
     })
     .setTimestamp(new Date(suggestion.updatedAt || suggestion.createdAt || Date.now()));
-
-  if (suggestion.reviewerId) {
-    embed.addFields({
-      name: "Reviewer",
-      value: `<@${suggestion.reviewerId}>`,
-      inline: true
-    });
-  }
 
   return embed;
 }
@@ -372,6 +308,36 @@ async function resolveSuggestionChannel(guild, preferredChannelId) {
   return channel;
 }
 
+function buildSuggestionAnnouncementContent(suggestion) {
+  return `Saran baru No ${suggestion.id} dari ${suggestion.authorMention}`;
+}
+
+async function addSuggestionVoteReaction(message) {
+  await message.react(SUGGESTION_UPVOTE_REACTION).catch(() => null);
+}
+
+async function createSuggestionDiscussionThread(message, suggestion) {
+  if (!message?.hasThread || message.thread) {
+    return null;
+  }
+
+  const thread = await message.startThread({
+    name: `Diskusi saran #${suggestion.id}`,
+    autoArchiveDuration: 1440,
+    reason: `Diskusi untuk suggestion #${suggestion.id}`
+  }).catch(() => null);
+
+  if (!thread) {
+    return null;
+  }
+
+  await thread.send({
+    content: `Thread ini untuk diskusi saran #${suggestion.id}.`
+  }).catch(() => null);
+
+  return thread;
+}
+
 async function syncSuggestionMessage(client, guild, suggestion, fallbackMessage = null) {
   if (!suggestion?.channelId || !suggestion?.messageId) {
     return {
@@ -402,6 +368,7 @@ async function syncSuggestionMessage(client, guild, suggestion, fallbackMessage 
   }
 
   await message.edit({
+    content: buildSuggestionAnnouncementContent(suggestion),
     embeds: [buildSuggestionEmbed(guild, suggestion)],
     components: buildSuggestionActionRows(suggestion)
   }).catch((error) => {
@@ -622,6 +589,7 @@ async function handleSuggestionModalSubmit(interaction, client) {
   await interaction.deferReply({ ephemeral: true }).catch(() => null);
 
   const targetChannel = await resolveSuggestionChannel(interaction.guild, interaction.channelId);
+  const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
 
   if (!targetChannel) {
     await interaction.editReply({
@@ -633,6 +601,13 @@ async function handleSuggestionModalSubmit(interaction, client) {
   const payload = {
     guildId: interaction.guildId,
     authorId: interaction.user.id,
+    authorMention: interaction.user.toString(),
+    authorName: member?.displayName || interaction.user.username,
+    authorAvatarUrl: interaction.user.displayAvatarURL({
+      extension: "png",
+      forceStatic: false,
+      size: 256
+    }),
     title: interaction.fields.getTextInputValue("title").trim(),
     category: interaction.fields.getTextInputValue("category").trim(),
     content: interaction.fields.getTextInputValue("content").trim(),
@@ -650,6 +625,7 @@ async function handleSuggestionModalSubmit(interaction, client) {
   const components = buildSuggestionActionRows(suggestion);
 
   const sent = await targetChannel.send({
+    content: buildSuggestionAnnouncementContent(suggestion),
     embeds: [embed],
     components
   }).catch((error) => {
@@ -669,6 +645,16 @@ async function handleSuggestionModalSubmit(interaction, client) {
     ...current,
     messageId: sent.id
   }));
+
+  const thread = await createSuggestionDiscussionThread(sent, suggestion);
+  await addSuggestionVoteReaction(sent);
+
+  if (thread) {
+    updateSuggestion(suggestion.id, (current) => ({
+      ...current,
+      threadId: thread.id
+    }));
+  }
 
   await interaction.editReply({
     content: `Suggestion kamu berhasil dikirim sebagai #${suggestion.publicId}.`
