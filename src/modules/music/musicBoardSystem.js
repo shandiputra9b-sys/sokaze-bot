@@ -94,7 +94,7 @@ function buildSectionFields(entries, options) {
   }
 
   return chunks.map((chunk, index) => ({
-    name: chunks.length > 1 ? `${options.title} (${index + 1}/${chunks.length})` : options.title,
+    name: options.title,
     value: chunk.map(buildBoardEntryLine).join("\n\n"),
     inline: false
   }));
