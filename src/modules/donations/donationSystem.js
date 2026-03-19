@@ -265,9 +265,8 @@ function buildDonationFeedEmbed(guild, data) {
     .setDescription([
       `${DONATION_HEADER_EMOJI} **DONATION FEED - SOKAZE**`,
       "",
-      `<@&${DONATION_FEED_ROLE_ID}>`,
       DONATION_RECEIVED_LABEL,
-      `${DONATION_DONOR_LABEL} ${data.donorReference}`,
+      `${DONATION_DONOR_LABEL} ${data.donorLabel}`,
       `${DONATION_AMOUNT_LABEL} ${formatCurrency(data.amount)}`,
       `${DONATION_DATE_LABEL} ${data.dateLabel}`,
       `${DONATION_NOTE_LABEL} ${data.note || "-"}`,
@@ -346,7 +345,7 @@ async function waitForDonationImage(channel, userId) {
 
     return {
       status: "image",
-      imageUrl: imageAttachment.url,
+      imageUrl: imageAttachment.proxyURL || imageAttachment.url,
       sourceMessage: collectedMessage
     };
   } catch (error) {
@@ -404,19 +403,6 @@ async function cleanupDonationPromptAfterTimeout(result) {
   if (result?.reminderMessage?.deletable) {
     await result.reminderMessage.delete().catch(() => null);
   }
-}
-
-async function handleCollectedDonationPrompt(result) {
-  if (["image", "skipped"].includes(result?.status)) {
-    await cleanupDonationPrompt(result);
-    return result;
-  }
-
-  if (result?.status === "final-timeout") {
-    await cleanupDonationPromptAfterTimeout(result);
-  }
-
-  return result;
 }
 
 async function setDonationChannel(interaction) {
@@ -562,9 +548,7 @@ async function handleDonationModalSubmit(interaction, client) {
       ]
     }).catch(() => null);
 
-    imageWaitResult = await handleCollectedDonationPrompt(
-      await collectDonationImageDecision(interaction.channel, interaction.user.id)
-    );
+    imageWaitResult = await collectDonationImageDecision(interaction.channel, interaction.user.id);
 
     sentMessage = await targetChannel.send({
       content: [
@@ -573,7 +557,7 @@ async function handleDonationModalSubmit(interaction, client) {
       ].filter(Boolean).join(" "),
       embeds: [
         buildDonationFeedEmbed(interaction.guild, {
-          donorReference: donorMember ? `<@${donorMember.id}>` : donorLabel,
+          donorLabel,
           amount,
           dateLabel: formatDonationDate(donationDate),
           note,
@@ -598,6 +582,12 @@ async function handleDonationModalSubmit(interaction, client) {
       embeds: [buildErrorEmbed("Gagal mengirim pencatatan donasi ke channel target.")]
     }).catch(() => null);
     return true;
+  }
+
+  if (["image", "skipped"].includes(imageWaitResult.status)) {
+    await cleanupDonationPrompt(imageWaitResult);
+  } else if (imageWaitResult.status === "final-timeout") {
+    await cleanupDonationPromptAfterTimeout(imageWaitResult);
   }
 
   let updatedDonator = null;
