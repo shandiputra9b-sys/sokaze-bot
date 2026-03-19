@@ -2,6 +2,8 @@ const { deleteAfkEntry, getAfkEntry, setAfkEntry } = require("../../services/afk
 
 const DEFAULT_AFK_REASON = "AFK dulu bentar.";
 const MAX_AFK_REASON_LENGTH = 160;
+const AFK_NICK_PREFIX = "[ AFK ] ";
+const MAX_NICKNAME_LENGTH = 32;
 const TEMP_REPLY_MS = 20 * 1000;
 
 function trimReason(value) {
@@ -48,15 +50,65 @@ function formatAfkReason(reason) {
   return trimReason(reason);
 }
 
+function stripAfkPrefix(value) {
+  return String(value || "").replace(/^\[\s*AFK\s*\]\s*/i, "").trim();
+}
+
+function buildAfkNickname(member) {
+  const baseName = stripAfkPrefix(member.nickname || member.displayName || member.user?.globalName || member.user?.username || "Member");
+  const availableLength = Math.max(1, MAX_NICKNAME_LENGTH - AFK_NICK_PREFIX.length);
+  return `${AFK_NICK_PREFIX}${baseName.slice(0, availableLength)}`.trim();
+}
+
+async function applyAfkNickname(member) {
+  if (!member?.manageable) {
+    return false;
+  }
+
+  const nextNickname = buildAfkNickname(member);
+
+  if (member.nickname === nextNickname) {
+    return true;
+  }
+
+  return member.setNickname(nextNickname, "AFK status enabled")
+    .then(() => true)
+    .catch(() => false);
+}
+
+async function restoreNicknameFromAfk(member, originalNickname = null) {
+  if (!member?.manageable) {
+    return false;
+  }
+
+  const currentNickname = member.nickname || "";
+  const currentLooksAfk = /^\[\s*AFK\s*\]/i.test(currentNickname);
+
+  if (!currentLooksAfk && currentNickname === (originalNickname || "")) {
+    return true;
+  }
+
+  return member.setNickname(originalNickname || null, "AFK status cleared")
+    .then(() => true)
+    .catch(() => false);
+}
+
 function getAfkStatus(guildId, userId) {
   return getAfkEntry(guildId, userId);
 }
 
-function setAfkStatus(guildId, userId, reason) {
-  return setAfkEntry(guildId, userId, {
+async function setAfkStatus(member, reason) {
+  const guildId = member.guild.id;
+  const userId = member.id;
+  const current = getAfkStatus(guildId, userId);
+  const entry = setAfkEntry(guildId, userId, {
     reason: formatAfkReason(reason),
-    sinceAt: new Date().toISOString()
+    sinceAt: new Date().toISOString(),
+    originalNickname: current?.originalNickname ?? member.nickname ?? null
   });
+
+  await applyAfkNickname(member);
+  return entry;
 }
 
 function clearAfkStatus(guildId, userId) {
@@ -74,6 +126,7 @@ async function clearAfkFromMessage(message) {
     return false;
   }
 
+  await restoreNicknameFromAfk(message.member, current.originalNickname ?? null);
   clearAfkStatus(message.guild.id, message.author.id);
   await sendTemporaryReply(
     message,
@@ -127,6 +180,7 @@ module.exports = {
   isAfkCommandContext,
   notifyMentionedAfkUsers,
   parseQuestionAfkCommand,
+  restoreNicknameFromAfk,
   sendTemporaryReply,
   setAfkStatus
 };

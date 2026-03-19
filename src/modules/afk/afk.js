@@ -8,7 +8,7 @@ module.exports = {
   usage: "afk [reason]",
   async execute(message, args) {
     const reason = formatAfkReason(args.join(" "));
-    setAfkStatus(message.guild.id, message.author.id, reason);
+    await setAfkStatus(message.member, reason);
 
     await sendTemporaryReply(
       message,
