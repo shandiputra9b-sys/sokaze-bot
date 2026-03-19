@@ -140,20 +140,6 @@ function buildSuggestionModal() {
     .setCustomId(SUGGESTION_MODAL_ID)
     .setTitle("Kirim Suggestion");
 
-  const titleInput = new TextInputBuilder()
-    .setCustomId("title")
-    .setLabel("Judul")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setMaxLength(100);
-
-  const categoryInput = new TextInputBuilder()
-    .setCustomId("category")
-    .setLabel("Kategori")
-    .setStyle(TextInputStyle.Short)
-    .setRequired(true)
-    .setMaxLength(32);
-
   const contentInput = new TextInputBuilder()
     .setCustomId("content")
     .setLabel("Isi Saran")
@@ -161,18 +147,8 @@ function buildSuggestionModal() {
     .setRequired(true)
     .setMaxLength(1000);
 
-  const benefitInput = new TextInputBuilder()
-    .setCustomId("benefit")
-    .setLabel("Manfaat / alasan")
-    .setStyle(TextInputStyle.Paragraph)
-    .setRequired(true)
-    .setMaxLength(500);
-
   modal.addComponents(
-    new ActionRowBuilder().addComponents(titleInput),
-    new ActionRowBuilder().addComponents(categoryInput),
-    new ActionRowBuilder().addComponents(contentInput),
-    new ActionRowBuilder().addComponents(benefitInput)
+    new ActionRowBuilder().addComponents(contentInput)
   );
 
   return modal;
@@ -195,30 +171,15 @@ function buildSuggestionEmbed(guild, suggestion) {
     .setColor(SUGGESTION_STATUS_COLORS[status] || SUGGESTION_STATUS_COLORS.pending)
     .setTitle("Saran Baru!!")
     .setDescription([
-      `💡 **Saran dari:**`,
+      "**Saran dari:**",
       `${suggestion.authorName} (${suggestion.authorMention})`,
       "",
-      `📝 **Sarannya adalah:**`,
-      suggestion.content,
-      "",
-      `✨ **Manfaat / alasan:**`,
-      suggestion.benefit
+      "**Sarannya adalah:**",
+      suggestion.content
     ].join("\n"))
     .setThumbnail(suggestion.authorAvatarUrl || null)
-    .addFields(
-      {
-        name: "Kategori",
-        value: suggestion.category,
-        inline: true
-      },
-      {
-        name: "Judul",
-        value: suggestion.title,
-        inline: true
-      }
-    )
     .setFooter({
-      text: `${guild.name} • ${new Date(suggestion.updatedAt || suggestion.createdAt || Date.now()).toLocaleString("id-ID")}`
+      text: `${guild.name} - ${new Date(suggestion.updatedAt || suggestion.createdAt || Date.now()).toLocaleString("id-ID")}`
     })
     .setTimestamp(new Date(suggestion.updatedAt || suggestion.createdAt || Date.now()));
 
@@ -317,7 +278,7 @@ async function addSuggestionVoteReaction(message) {
 }
 
 async function createSuggestionDiscussionThread(message, suggestion) {
-  if (!message?.hasThread || message.thread) {
+  if (!message || message.thread) {
     return null;
   }
 
@@ -325,7 +286,10 @@ async function createSuggestionDiscussionThread(message, suggestion) {
     name: `Diskusi saran #${suggestion.id}`,
     autoArchiveDuration: 1440,
     reason: `Diskusi untuk suggestion #${suggestion.id}`
-  }).catch(() => null);
+  }).catch((error) => {
+    console.error(`Failed to create suggestion thread #${suggestion.id}:`, error);
+    return null;
+  });
 
   if (!thread) {
     return null;
@@ -608,10 +572,10 @@ async function handleSuggestionModalSubmit(interaction, client) {
       forceStatic: false,
       size: 256
     }),
-    title: interaction.fields.getTextInputValue("title").trim(),
-    category: interaction.fields.getTextInputValue("category").trim(),
     content: interaction.fields.getTextInputValue("content").trim(),
-    benefit: interaction.fields.getTextInputValue("benefit").trim(),
+    title: "",
+    category: "Suggestion",
+    benefit: "",
     status: "pending",
     reviewerId: "",
     channelId: targetChannel.id,
