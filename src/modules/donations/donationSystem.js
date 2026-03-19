@@ -265,8 +265,9 @@ function buildDonationFeedEmbed(guild, data) {
     .setDescription([
       `${DONATION_HEADER_EMOJI} **DONATION FEED - SOKAZE**`,
       "",
+      data.roleMention,
       DONATION_RECEIVED_LABEL,
-      `${DONATION_DONOR_LABEL} ${data.donorLabel}`,
+      `${DONATION_DONOR_LABEL} ${data.donorMention || data.donorLabel}`,
       `${DONATION_AMOUNT_LABEL} ${formatCurrency(data.amount)}`,
       `${DONATION_DATE_LABEL} ${data.dateLabel}`,
       `${DONATION_NOTE_LABEL} ${data.note || "-"}`,
@@ -551,13 +552,11 @@ async function handleDonationModalSubmit(interaction, client) {
     imageWaitResult = await collectDonationImageDecision(interaction.channel, interaction.user.id);
 
     sentMessage = await targetChannel.send({
-      content: [
-        `<@&${DONATION_FEED_ROLE_ID}>`,
-        donorMember ? `<@${donorMember.id}>` : ""
-      ].filter(Boolean).join(" "),
       embeds: [
         buildDonationFeedEmbed(interaction.guild, {
+          roleMention: `<@&${DONATION_FEED_ROLE_ID}>`,
           donorLabel,
+          donorMention: donorMember ? `<@${donorMember.id}>` : "",
           amount,
           dateLabel: formatDonationDate(donationDate),
           note,
@@ -566,8 +565,8 @@ async function handleDonationModalSubmit(interaction, client) {
       ],
       allowedMentions: {
         parse: [],
-        roles: [DONATION_FEED_ROLE_ID],
-        users: donorMember ? [donorMember.id] : []
+        roles: [],
+        users: []
       }
     }).catch((error) => {
       console.error("Failed to send donation log message:", error);
