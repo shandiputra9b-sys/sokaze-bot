@@ -51,6 +51,10 @@ const {
 const {
   handleStickyModalSubmit
 } = require("../modules/sticky/stickySystem");
+const {
+  handleSuggestionButton,
+  handleSuggestionModalSubmit
+} = require("../modules/suggestions/suggestionSystem");
 
 module.exports = {
   name: "interactionCreate",
@@ -104,6 +108,10 @@ module.exports = {
     }
 
     if (interaction.isButton()) {
+      if (await handleSuggestionButton(interaction, client)) {
+        return;
+      }
+
       if (await handleIdCardButton(interaction, client)) {
         return;
       }
@@ -205,6 +213,10 @@ module.exports = {
     }
 
     if (await handleStickyModalSubmit(interaction, client)) {
+      return;
+    }
+
+    if (await handleSuggestionModalSubmit(interaction, client)) {
       return;
     }
 
