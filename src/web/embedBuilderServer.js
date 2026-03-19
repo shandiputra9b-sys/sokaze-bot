@@ -3,15 +3,23 @@ const fs = require("node:fs/promises");
 const http = require("node:http");
 const path = require("node:path");
 const {
+  appendAuditEntry,
+  listAuditEntries
+} = require("../services/embedBuilderAuditStore");
+const {
   createTemplate,
   deleteTemplate,
+  duplicateTemplate,
   getTemplate,
   listTemplates,
+  sanitizeTemplateTags,
   updateTemplate
 } = require("../services/embedTemplateStore");
 const {
   MAX_BUTTONS,
+  MAX_EMBEDS,
   MAX_FIELDS,
+  fetchBuilderMessage,
   listAvailableTextChannels,
   normalizeBuilderPayload,
   sendBuilderMessage
@@ -19,6 +27,7 @@ const {
 
 const SESSION_COOKIE_NAME = "sokaze_embed_session";
 const sessions = new Map();
+const staticAssetCache = new Map();
 
 function parseCookies(cookieHeader = "") {
   return Object.fromEntries(
@@ -47,6 +56,16 @@ function sendText(response, statusCode, payload, contentType = "text/plain; char
     ...extraHeaders
   });
   response.end(payload);
+}
+
+async function readStaticAsset(filePath) {
+  if (staticAssetCache.has(filePath)) {
+    return staticAssetCache.get(filePath);
+  }
+
+  const content = await fs.readFile(filePath, "utf8");
+  staticAssetCache.set(filePath, content);
+  return content;
 }
 
 async function readRequestBody(request) {
@@ -120,6 +139,7 @@ function mapTemplatesForResponse() {
   return listTemplates().map((template) => ({
     id: template.id,
     name: template.name,
+    tags: template.tags || [],
     payload: normalizeBuilderPayload(template.payload),
     updatedAt: template.updatedAt
   }));
@@ -162,7 +182,9 @@ async function handleBootstrap(response, client) {
     ok: true,
     channels,
     templates,
+    audits: listAuditEntries(12),
     limits: {
+      embeds: MAX_EMBEDS,
       fields: MAX_FIELDS,
       buttons: MAX_BUTTONS
     }
@@ -173,6 +195,7 @@ async function handleTemplateSave(request, response) {
   const payload = await readJsonBody(request);
   const name = String(payload.name || "").trim().slice(0, 80);
   const normalized = normalizeBuilderPayload(payload.payload || {});
+  const tags = sanitizeTemplateTags(payload.tags);
 
   if (!name) {
     sendJson(response, 400, {
@@ -188,17 +211,62 @@ async function handleTemplateSave(request, response) {
     template = updateTemplate(payload.templateId, (current) => ({
       ...current,
       name,
+      tags,
       payload: normalized
     }));
   } else {
-    template = createTemplate(name, normalized);
+    template = createTemplate(name, normalized, { tags });
   }
+
+  appendAuditEntry({
+    action: payload.templateId ? "template-update" : "template-create",
+    templateId: template.id,
+    templateName: template.name,
+    detail: tags.length ? `Tags: ${tags.join(", ")}` : "No tags"
+  });
 
   sendJson(response, 200, {
     ok: true,
     template: {
       id: template.id,
       name: template.name,
+      tags: template.tags || [],
+      payload: normalizeBuilderPayload(template.payload),
+      updatedAt: template.updatedAt
+    }
+  });
+}
+
+async function handleTemplateDuplicate(request, response) {
+  const payload = await readJsonBody(request);
+  const source = getTemplate(payload.templateId);
+
+  if (!source) {
+    sendJson(response, 404, {
+      ok: false,
+      error: "Template sumber tidak ditemukan."
+    });
+    return;
+  }
+
+  const template = duplicateTemplate(source.id, {
+    name: String(payload.name || `${source.name} Copy`).trim().slice(0, 80) || `${source.name} Copy`,
+    tags: sanitizeTemplateTags(payload.tags?.length ? payload.tags : source.tags)
+  });
+
+  appendAuditEntry({
+    action: "template-duplicate",
+    templateId: template.id,
+    templateName: template.name,
+    detail: `From ${source.id}`
+  });
+
+  sendJson(response, 200, {
+    ok: true,
+    template: {
+      id: template.id,
+      name: template.name,
+      tags: template.tags || [],
       payload: normalizeBuilderPayload(template.payload),
       updatedAt: template.updatedAt
     }
@@ -216,14 +284,61 @@ async function handleTemplateDelete(response, templateId) {
     return;
   }
 
+  appendAuditEntry({
+    action: "template-delete",
+    templateId: deleted.id,
+    templateName: deleted.name
+  });
+
   sendJson(response, 200, {
     ok: true
+  });
+}
+
+async function handleChannels(response, client, refresh = false) {
+  const channels = await listAvailableTextChannels(client, {
+    forceRefresh: refresh
+  });
+
+  if (refresh) {
+    appendAuditEntry({
+      action: "channels-refresh",
+      detail: `${channels.length} guild entries`
+    });
+  }
+
+  sendJson(response, 200, {
+    ok: true,
+    channels
+  });
+}
+
+async function handleFetchMessage(request, response, client) {
+  const payload = await readJsonBody(request);
+  const result = await fetchBuilderMessage(client, payload.payload || payload);
+
+  appendAuditEntry({
+    action: "message-fetch",
+    channelId: result.channelId,
+    messageId: result.messageId,
+    detail: result.authorId ? `Author ${result.authorId}` : ""
+  });
+
+  sendJson(response, 200, {
+    ok: true,
+    result
   });
 }
 
 async function handleSend(request, response, client) {
   const payload = await readJsonBody(request);
   const result = await sendBuilderMessage(client, payload.payload || payload);
+
+  appendAuditEntry({
+    action: result.action === "edit" ? "message-edit" : "message-send",
+    channelId: result.channelId,
+    messageId: result.messageId
+  });
 
   sendJson(response, 200, {
     ok: true,
@@ -254,18 +369,24 @@ function startEmbedBuilderServer(client) {
       const url = new URL(request.url, `http://${request.headers.host || `${serverConfig.host}:${serverConfig.port}`}`);
 
       if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/embed-builder")) {
-        const html = await fs.readFile(staticPaths.html, "utf8");
-        return sendText(response, 200, html, "text/html; charset=utf-8");
+        const html = await readStaticAsset(staticPaths.html);
+        return sendText(response, 200, html, "text/html; charset=utf-8", {
+          "Cache-Control": "no-store"
+        });
       }
 
       if (request.method === "GET" && url.pathname === "/embed-builder.css") {
-        const css = await fs.readFile(staticPaths.css, "utf8");
-        return sendText(response, 200, css, "text/css; charset=utf-8");
+        const css = await readStaticAsset(staticPaths.css);
+        return sendText(response, 200, css, "text/css; charset=utf-8", {
+          "Cache-Control": "public, max-age=60"
+        });
       }
 
       if (request.method === "GET" && url.pathname === "/embed-builder.js") {
-        const js = await fs.readFile(staticPaths.js, "utf8");
-        return sendText(response, 200, js, "application/javascript; charset=utf-8");
+        const js = await readStaticAsset(staticPaths.js);
+        return sendText(response, 200, js, "application/javascript; charset=utf-8", {
+          "Cache-Control": "public, max-age=60"
+        });
       }
 
       if (request.method === "POST" && url.pathname === "/api/embed-builder/login") {
@@ -300,6 +421,10 @@ function startEmbedBuilderServer(client) {
         return handleBootstrap(response, client);
       }
 
+      if (request.method === "GET" && url.pathname === "/api/embed-builder/channels") {
+        return handleChannels(response, client, url.searchParams.get("refresh") === "1");
+      }
+
       if (request.method === "GET" && url.pathname === "/api/embed-builder/templates") {
         return sendJson(response, 200, {
           ok: true,
@@ -311,9 +436,17 @@ function startEmbedBuilderServer(client) {
         return handleTemplateSave(request, response);
       }
 
+      if (request.method === "POST" && url.pathname === "/api/embed-builder/templates/duplicate") {
+        return handleTemplateDuplicate(request, response);
+      }
+
       if (request.method === "DELETE" && url.pathname.startsWith("/api/embed-builder/templates/")) {
         const templateId = url.pathname.slice("/api/embed-builder/templates/".length);
         return handleTemplateDelete(response, templateId);
+      }
+
+      if (request.method === "POST" && url.pathname === "/api/embed-builder/fetch-message") {
+        return handleFetchMessage(request, response, client);
       }
 
       if (request.method === "POST" && url.pathname === "/api/embed-builder/send") {

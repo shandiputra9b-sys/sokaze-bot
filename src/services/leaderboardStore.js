@@ -178,6 +178,29 @@ function setDonatorAmount(guildId, userId, amount) {
   return donators[userId];
 }
 
+function getDonator(guildId, userId) {
+  const store = readStore();
+  return store.donators[guildId]?.[userId] || null;
+}
+
+function incrementDonatorAmount(guildId, userId, amount) {
+  const store = readStore();
+  const donators = store.donators[guildId] || {};
+  const currentAmount = Number.parseInt(String(donators[userId]?.amount || 0), 10) || 0;
+  const increment = Math.max(0, Number.parseInt(String(amount || 0), 10) || 0);
+
+  donators[userId] = {
+    guildId,
+    userId,
+    amount: currentAmount + increment,
+    updatedAt: new Date().toISOString()
+  };
+
+  store.donators[guildId] = donators;
+  writeStore(store);
+  return donators[userId];
+}
+
 function removeDonator(guildId, userId) {
   const store = readStore();
   const donators = store.donators[guildId] || {};
@@ -198,7 +221,9 @@ function listDonators(guildId) {
 }
 
 module.exports = {
+  getDonator,
   getVoiceSession,
+  incrementDonatorAmount,
   incrementChatCount,
   listChatEntries,
   listDonators,

@@ -24,6 +24,7 @@
       <div>
         <p class="eyebrow">Sokaze</p>
         <h1>Embed Builder</h1>
+        <p class="muted topbar-copy">Compact editor, live preview, autosave draft, dan kirim langsung ke Discord.</p>
       </div>
       <div class="topbar-actions">
         <button id="logoutButton" type="button" class="ghost-button">Logout</button>
@@ -33,38 +34,129 @@
 
     <main class="page">
       <section class="editor-shell">
-        <div class="compact-grid">
-          <label class="stack">
-            <span>Channel</span>
-            <select id="channelSelect"></select>
-          </label>
+        <section class="card">
+          <div class="card-body compact-grid">
+            <div class="stack">
+              <span>Channel</span>
+              <div class="inline-action-row">
+                <select id="channelSelect"></select>
+                <button id="refreshChannelsButton" type="button" class="ghost-button mini-label-button">Refresh</button>
+              </div>
+            </div>
 
-          <div class="template-row">
-            <label class="stack grow">
-              <span>Template</span>
-              <select id="templateSelect"></select>
-            </label>
-            <button id="loadTemplateButton" type="button" class="ghost-button">Load</button>
-            <button id="deleteTemplateButton" type="button" class="ghost-button danger">Delete</button>
+            <div class="stack info-chip-shell">
+              <span>Status Draft</span>
+              <div class="info-chip-row">
+                <span id="autosaveBadge" class="info-chip">Draft kosong</span>
+                <span id="embedCountBadge" class="info-chip">1 embed aktif</span>
+              </div>
+            </div>
           </div>
-        </div>
+        </section>
+
+        <section class="card">
+          <div class="card-body target-layout">
+            <label class="stack">
+              <span>Aksi Pesan</span>
+              <select id="messageActionSelect">
+                <option value="send">Kirim pesan baru</option>
+                <option value="edit">Edit pesan existing</option>
+              </select>
+            </label>
+
+            <label class="stack grow">
+              <span>Message Link / ID</span>
+              <input id="messageTargetInput" type="text" placeholder="Paste jump URL atau message ID Discord" />
+              <span id="messageTargetHint" class="field-hint">
+                Saat mode edit, tempel jump URL Discord atau message ID. Jika pakai link, channel akan ikut terbaca otomatis.
+              </span>
+            </label>
+
+            <div class="stack info-chip-shell">
+              <span>Status Target</span>
+              <div class="info-chip-row">
+                <span id="messageTargetBadge" class="info-chip">Mode kirim baru</span>
+              </div>
+            </div>
+
+            <div class="target-actions">
+              <button id="fetchMessageButton" type="button" class="ghost-button">Fetch Message</button>
+              <button id="cloneMessageToTemplateButton" type="button" class="ghost-button">Clone to Template</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-body">
+            <div class="section-head">
+              <div>
+                <strong>Recent Targets</strong>
+                <p class="muted">Simpan channel dan target pesan terakhir untuk buka workflow lebih cepat.</p>
+              </div>
+              <div class="section-head-actions">
+                <button id="clearRecentTargetsButton" type="button" class="ghost-button danger">Clear Recent</button>
+              </div>
+            </div>
+            <div id="recentTargets" class="recent-targets-list"></div>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-body template-layout">
+            <div class="template-row">
+              <label class="stack grow">
+                <span>Template Search</span>
+                <input id="templateSearchInput" type="text" maxlength="80" placeholder="Cari nama atau tag template" />
+              </label>
+            </div>
+
+            <div class="template-row">
+              <label class="stack grow">
+                <span>Template</span>
+                <select id="templateSelect"></select>
+              </label>
+              <button id="loadTemplateButton" type="button" class="ghost-button">Load</button>
+              <button id="duplicateTemplateButton" type="button" class="ghost-button">Duplicate</button>
+              <button id="deleteTemplateButton" type="button" class="ghost-button danger">Delete</button>
+            </div>
+
+            <div class="template-row">
+              <label class="stack grow">
+                <span>Template Name</span>
+                <input id="templateNameInput" type="text" maxlength="80" placeholder="Nama template" />
+              </label>
+              <label class="stack grow">
+                <span>Tags</span>
+                <input id="templateTagsInput" type="text" maxlength="160" placeholder="announcement, event, rules" />
+              </label>
+              <button id="saveTemplateButton" type="button" class="primary-button">Save Template</button>
+            </div>
+
+            <div id="templateMeta" class="template-meta muted"></div>
+          </div>
+        </section>
 
         <section class="card toolbar-card">
           <div class="toolbar-header">
-            <strong>Formatting</strong>
+            <strong>Formatting Toolbar</strong>
             <span id="formatTargetLabel">Fokus: belum ada textarea aktif</span>
           </div>
           <div class="toolbar-grid">
-            <button type="button" data-format="bold"><strong>B</strong></button>
-            <button type="button" data-format="italic"><em>I</em></button>
-            <button type="button" data-format="underline"><u>U</u></button>
-            <button type="button" data-format="strike"><s>S</s></button>
-            <button type="button" data-format="spoiler">||</button>
-            <button type="button" data-format="code">`</button>
-            <button type="button" data-format="codeblock">{ }</button>
-            <button type="button" data-format="quote">"</button>
-            <button type="button" data-format="bullet">•</button>
-            <button type="button" data-format="number">1.</button>
+            <button type="button" data-format="bold" title="Bold"><strong>B</strong></button>
+            <button type="button" data-format="italic" title="Italic"><em>I</em></button>
+            <button type="button" data-format="underline" title="Underline"><u>U</u></button>
+            <button type="button" data-format="strike" title="Strikethrough"><s>S</s></button>
+            <button type="button" data-format="spoiler" title="Spoiler">||</button>
+            <button type="button" data-format="code" title="Inline code">`</button>
+            <button type="button" data-format="codeblock" title="Code block">{ }</button>
+            <button type="button" data-format="quote" title="Quote">></button>
+            <button type="button" data-format="bullet" title="Bullet list">-</button>
+            <button type="button" data-format="number" title="Numbered list">1.</button>
+            <button type="button" data-format="user-mention" title="User mention">@U</button>
+            <button type="button" data-format="role-mention" title="Role mention">@R</button>
+            <button type="button" data-format="channel-mention" title="Channel mention">#C</button>
+            <button type="button" data-format="masked-link" title="Masked link">[Link]</button>
+            <button type="button" data-format="timestamp" title="Discord timestamp">&lt;t:&gt;</button>
           </div>
         </section>
 
@@ -78,53 +170,89 @@
           </div>
         </details>
 
+        <section class="card">
+          <div class="card-body">
+            <div class="section-head">
+              <div>
+                <strong>Embeds</strong>
+                <p class="muted">Satu pesan bisa punya beberapa embed. Pilih embed aktif untuk diedit.</p>
+              </div>
+              <div class="section-head-actions">
+                <button id="addEmbedButton" type="button" class="ghost-button">Add Embed</button>
+                <button id="duplicateEmbedButton" type="button" class="ghost-button">Duplicate</button>
+              </div>
+            </div>
+
+            <div id="embedTabs" class="embed-tabs"></div>
+          </div>
+        </section>
+
         <details class="card" open>
-          <summary>Embed</summary>
-          <div class="card-body double-grid">
-            <label class="stack">
-              <span>Title</span>
-              <input id="embedTitle" type="text" maxlength="256" />
-            </label>
-            <label class="stack">
-              <span>Color</span>
-              <input id="embedColor" type="color" value="#111214" />
-            </label>
-            <label class="stack full">
-              <span>Description</span>
-              <textarea id="embedDescription" data-format-target="Embed Description" rows="8"></textarea>
-            </label>
-            <label class="stack">
-              <span>Author Name</span>
-              <input id="authorName" type="text" maxlength="256" />
-            </label>
-            <label class="stack">
-              <span>Author Icon URL</span>
-              <input id="authorIconUrl" type="url" placeholder="https://..." />
-            </label>
-            <label class="stack">
-              <span>Author URL</span>
-              <input id="authorUrl" type="url" placeholder="https://..." />
-            </label>
-            <label class="stack">
-              <span>Thumbnail URL</span>
-              <input id="thumbnailUrl" type="url" placeholder="https://..." />
-            </label>
-            <label class="stack full">
-              <span>Image URL</span>
-              <input id="imageUrl" type="url" placeholder="https://..." />
-            </label>
-            <label class="stack">
-              <span>Footer Text</span>
-              <input id="footerText" type="text" maxlength="2048" />
-            </label>
-            <label class="stack">
-              <span>Footer Icon URL</span>
-              <input id="footerIconUrl" type="url" placeholder="https://..." />
-            </label>
-            <label class="inline-check">
-              <input id="timestampToggle" type="checkbox" />
-              <span>Timestamp</span>
-            </label>
+          <summary>Embed Editor</summary>
+          <div class="card-body">
+            <div class="embed-editor-toolbar">
+              <span id="activeEmbedLabel" class="info-chip">Editing Embed 1</span>
+              <div class="section-head-actions">
+                <button id="moveEmbedUpButton" type="button" class="ghost-button mini-label-button">Move Up</button>
+                <button id="moveEmbedDownButton" type="button" class="ghost-button mini-label-button">Move Down</button>
+                <button id="removeEmbedButton" type="button" class="ghost-button danger mini-label-button">Remove</button>
+              </div>
+            </div>
+
+            <div class="double-grid">
+              <label class="stack">
+                <span>Title</span>
+                <input id="embedTitle" type="text" maxlength="256" />
+              </label>
+              <label class="stack">
+                <span>Color</span>
+                <input id="embedColor" type="color" value="#111214" />
+              </label>
+              <label class="stack full">
+                <span>Description</span>
+                <textarea id="embedDescription" data-format-target="Embed Description" rows="8"></textarea>
+              </label>
+              <label class="stack">
+                <span>Author Name</span>
+                <input id="authorName" type="text" maxlength="256" />
+              </label>
+              <label class="stack">
+                <span>Author Icon URL</span>
+                <input id="authorIconUrl" type="url" placeholder="https://..." />
+              </label>
+              <label class="stack">
+                <span>Author URL</span>
+                <input id="authorUrl" type="url" placeholder="https://..." />
+              </label>
+              <label class="stack">
+                <span>Thumbnail URL</span>
+                <input id="thumbnailUrl" type="url" placeholder="https://..." />
+              </label>
+              <label class="stack full">
+                <span>Image URL</span>
+                <input id="imageUrl" type="url" placeholder="https://..." />
+              </label>
+              <label class="stack">
+                <span>Footer Text</span>
+                <input id="footerText" type="text" maxlength="2048" />
+              </label>
+              <label class="stack">
+                <span>Footer Icon URL</span>
+                <input id="footerIconUrl" type="url" placeholder="https://..." />
+              </label>
+              <label class="stack">
+                <span>Timestamp</span>
+                <select id="timestampMode">
+                  <option value="off">Off</option>
+                  <option value="now">Now</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </label>
+              <label class="stack">
+                <span>Custom Timestamp</span>
+                <input id="timestampCustomInput" type="datetime-local" />
+              </label>
+            </div>
           </div>
         </details>
 
@@ -144,23 +272,75 @@
           </div>
         </details>
 
-        <section class="card template-save-card">
-          <div class="card-body template-save-row">
-            <label class="stack grow">
-              <span>Template Name</span>
-              <input id="templateNameInput" type="text" maxlength="80" placeholder="Nama template" />
+        <details class="card">
+          <summary>Import / Export JSON</summary>
+          <div class="card-body">
+            <label class="stack">
+              <span>Builder / Discord JSON</span>
+              <textarea id="jsonPayload" rows="10" spellcheck="false" placeholder='{"content":"","embeds":[...],"components":[...]}'></textarea>
             </label>
-            <button id="saveTemplateButton" type="button" class="primary-button">Save Template</button>
+            <p class="field-hint">
+              Import menerima format builder ini atau payload Discord/Discohook-style dengan `content`, `embeds`, dan `components`.
+            </p>
+            <div class="json-actions">
+              <button id="exportJsonButton" type="button" class="ghost-button">Export Builder JSON</button>
+              <button id="exportDiscordJsonButton" type="button" class="ghost-button">Export Discord JSON</button>
+              <button id="importJsonButton" type="button" class="primary-button">Import JSON</button>
+              <button id="clearJsonButton" type="button" class="ghost-button danger">Clear Box</button>
+            </div>
           </div>
-          <p id="statusText" class="status-text"></p>
+        </details>
+
+        <section class="card">
+          <div class="card-body">
+            <p id="statusText" class="status-text"></p>
+          </div>
+        </section>
+
+        <section class="card">
+          <div class="card-body">
+            <div class="section-head">
+              <div>
+                <strong>Validation</strong>
+                <p class="muted">Cek warning sebelum payload dikirim ke Discord.</p>
+              </div>
+            </div>
+            <div id="validationList" class="diagnostic-list"></div>
+          </div>
+        </section>
+
+        <details class="card">
+          <summary>Raw Discord Payload</summary>
+          <div class="card-body">
+            <pre id="rawPayloadPreview" class="raw-payload-preview"></pre>
+          </div>
+        </details>
+
+        <section class="card">
+          <div class="card-body">
+            <div class="section-head">
+              <div>
+                <strong>Audit Log</strong>
+                <p class="muted">Riwayat aksi builder terbaru dari server.</p>
+              </div>
+            </div>
+            <div id="auditList" class="audit-list"></div>
+          </div>
         </section>
       </section>
 
       <aside class="preview-shell">
-        <div class="preview-card">
+        <div id="previewCard" class="preview-card">
           <div class="preview-header">
             <strong>Live Preview</strong>
-            <span>Discord-style</span>
+            <div class="preview-controls">
+              <span>Discord-style</span>
+              <select id="previewModeSelect">
+                <option value="desktop">Desktop</option>
+                <option value="mobile">Mobile</option>
+                <option value="compact">Compact</option>
+              </select>
+            </div>
           </div>
           <div id="previewRoot" class="discord-preview"></div>
         </div>

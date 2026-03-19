@@ -55,6 +55,9 @@ const {
   handleSuggestionButton,
   handleSuggestionModalSubmit
 } = require("../modules/suggestions/suggestionSystem");
+const {
+  handleDonationModalSubmit
+} = require("../modules/donations/donationSystem");
 
 module.exports = {
   name: "interactionCreate",
@@ -217,6 +220,10 @@ module.exports = {
     }
 
     if (await handleSuggestionModalSubmit(interaction, client)) {
+      return;
+    }
+
+    if (await handleDonationModalSubmit(interaction, client)) {
       return;
     }
 

@@ -2,6 +2,7 @@ const { EmbedBuilder } = require("discord.js");
 const { getGuildSettings, updateGuildSettings } = require("../../services/guildConfigService");
 const {
   incrementChatCount,
+  incrementDonatorAmount,
   listChatEntries,
   listDonators,
   listVoiceSessions,
@@ -63,7 +64,7 @@ const BOARD_META = {
     key: "donator",
     title: "Top Donatur",
     kicker: "SOKAZE TOP DONATUR",
-    subtitle: "Leaderboard donatur manual yang diinput admin.",
+    subtitle: "Leaderboard akumulasi donasi yang dicatat admin dan bot.",
     accentColor: "#f59e0b",
     footerRight: "Donatur Board",
     fileName: "sokaze-top-donatur.png"
@@ -377,7 +378,7 @@ async function buildDonatorBoardEntries(guild) {
       name: member?.displayName || user.globalName || user.username,
       handle: `@${user.username}`,
       primary: formatCurrency(entry.amount || 0),
-      secondary: "Input admin"
+      secondary: "Akumulasi donasi"
     };
   }));
 }
@@ -651,11 +652,16 @@ function setDonatorValue(guildId, userId, amount) {
   return setDonatorAmount(guildId, userId, amount);
 }
 
+function addDonatorValue(guildId, userId, amount) {
+  return incrementDonatorAmount(guildId, userId, amount);
+}
+
 function removeDonatorValue(guildId, userId) {
   return removeDonator(guildId, userId);
 }
 
 module.exports = {
+  addDonatorValue,
   DEFAULT_LEADERBOARD_SETTINGS,
   bootstrapVoiceSessions,
   getLeaderboardSettings,
