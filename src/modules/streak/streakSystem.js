@@ -1,4 +1,4 @@
-const { EmbedBuilder } = require("discord.js");
+const { EmbedBuilder, PermissionFlagsBits } = require("discord.js");
 const { getGuildSettings, updateGuildSettings } = require("../../services/guildConfigService");
 const {
   deletePair,
@@ -13,15 +13,15 @@ const streakTopBoardRefreshes = new Map();
 const PENDING_STREAK_EMOJI = "❓";
 
 const STREAK_TIERS = [
-  { key: "ember", min: 1, max: 6, emojiName: "streak_ember", assetFile: "ember.png", label: "Ember" },
-  { key: "blaze", min: 7, max: 24, emojiName: "streak_blaze", assetFile: "blaze.png", label: "Blaze" },
-  { key: "flare", min: 25, max: 49, emojiName: "streak_flare", assetFile: "flare.png", label: "Flare" },
-  { key: "goldfire", min: 50, max: 99, emojiName: "streak_goldfire", assetFile: "goldfire.png", label: "Goldfire" },
-  { key: "bluefire", min: 100, max: 149, emojiName: "streak_bluefire", assetFile: "bluefire.png", label: "Bluefire" },
-  { key: "sapphire", min: 150, max: 249, emojiName: "streak_sapphire", assetFile: "sapphire.png", label: "Sapphire" },
-  { key: "soulfire", min: 250, max: 364, emojiName: "streak_soulfire", assetFile: "soulfire.png", label: "Soulfire" },
-  { key: "eternal", min: 365, max: 499, emojiName: "streak_eternal", assetFile: "eternal.png", label: "Eternal" },
-  { key: "mythic", min: 500, max: Number.POSITIVE_INFINITY, emojiName: "streak_mythic", assetFile: "mythic.png", label: "Mythic" }
+  { key: "ember", min: 1, max: 6, emojiId: "1483769703536001104", assetFile: "ember.png", label: "Ember" },
+  { key: "blaze", min: 7, max: 24, emojiId: "1483769754517897327", assetFile: "blaze.png", label: "Blaze" },
+  { key: "flare", min: 25, max: 49, emojiId: "1483769803650109511", assetFile: "flare.png", label: "Flare" },
+  { key: "goldfire", min: 50, max: 99, emojiId: "1483769898680193095", assetFile: "goldfire.png", label: "Goldfire" },
+  { key: "bluefire", min: 100, max: 149, emojiId: "1483769934399012894", assetFile: "bluefire.png", label: "Bluefire" },
+  { key: "sapphire", min: 150, max: 249, emojiId: "1483769985284313098", assetFile: "sapphire.png", label: "Sapphire" },
+  { key: "soulfire", min: 250, max: 364, emojiId: "1483770037243220110", assetFile: "soulfire.png", label: "Soulfire" },
+  { key: "eternal", min: 365, max: 499, emojiId: "1483770088644415619", assetFile: "eternal.png", label: "Eternal" },
+  { key: "mythic", min: 500, max: Number.POSITIVE_INFINITY, emojiId: "1483770151412305922", assetFile: "mythic.png", label: "Mythic" }
 ];
 
 const DEFAULT_STREAK_SETTINGS = {
@@ -232,6 +232,36 @@ function getStreakTier(streakCount) {
   return STREAK_TIERS.find((tier) => streakCount >= tier.min && streakCount <= tier.max) || STREAK_TIERS[0];
 }
 
+async function ensureClientApplication(client) {
+  if (!client?.application) {
+    return null;
+  }
+
+  if (!client.application.partial) {
+    return client.application;
+  }
+
+  return client.application.fetch().catch(() => client.application);
+}
+
+async function fetchApplicationTierEmojis(client) {
+  const application = await ensureClientApplication(client);
+
+  if (!application?.emojis) {
+    return new Map();
+  }
+
+  return application.emojis.fetch().catch(() => application.emojis.cache);
+}
+
+function getTierEmojiDisplay(emojiCollection, tier) {
+  if (!tier?.emojiId) {
+    return "🔥";
+  }
+
+  return emojiCollection.get(tier.emojiId)?.toString() || "🔥";
+}
+
 function normalizePage(value, fallback = 1) {
   const page = Number.parseInt(String(value || fallback), 10);
   return Number.isInteger(page) && page > 0 ? page : fallback;
@@ -361,8 +391,7 @@ function buildStreakTopBoardEmbed(guild, data, attachmentName) {
 
 async function buildStreakInfoFallbackEmbed(guild, client, targetMember, requestedPage = 1) {
   const data = await buildStreakInfoData(guild, client, targetMember, requestedPage);
-  const emojiCollection = await guild.emojis.fetch().catch(() => guild.emojis.cache);
-  const emojiByName = new Map(emojiCollection.map((emoji) => [emoji.name, emoji]));
+  const emojiCollection = await fetchApplicationTierEmojis(client);
 
   if (!data.totalPartners) {
     return new EmbedBuilder()
@@ -381,7 +410,7 @@ async function buildStreakInfoFallbackEmbed(guild, client, targetMember, request
   }
 
   const lines = data.entries.map((entry) => {
-    const tierEmoji = emojiByName.get(entry.tier.emojiName)?.toString() || "🔥";
+    const tierEmoji = getTierEmojiDisplay(emojiCollection, entry.tier);
     const statusLabel = entry.completedToday ? "✅ Nyala Hari Ini" : "❌ Belum Nyala 😴";
     return `#${entry.rank} ${entry.partnerName} - ${entry.currentStreak} ${tierEmoji} (${entry.bestStreak}) - ${statusLabel}`;
   });
@@ -466,8 +495,14 @@ function buildAcceptedPair(guildId, userAId, userBId, dateKey, pendingInvite, ac
 
 async function resolveTierEmoji(guild, pair) {
   const tier = getStreakTier(Math.max(pair.currentStreak, 1));
-  return guild.emojis.cache.find((emoji) => emoji.name === tier.emojiName)
-    || await guild.emojis.fetch().then((emojis) => emojis.find((emoji) => emoji.name === tier.emojiName)).catch(() => null);
+  const application = await ensureClientApplication(guild?.client);
+
+  if (!application?.emojis || !tier.emojiId) {
+    return null;
+  }
+
+  return application.emojis.cache.get(tier.emojiId)
+    || await application.emojis.fetch(tier.emojiId).catch(() => null);
 }
 
 async function fetchPendingInviteMessage(guild, pendingInvite) {
@@ -513,10 +548,41 @@ async function reactMessagesWithTierEmoji(messages, pair) {
   const guildEmoji = await resolveTierEmoji(uniqueMessages[0].guild, pair);
 
   if (!guildEmoji) {
+    console.warn(
+      `Streak tier emoji not found for tier "${getStreakTier(Math.max(pair.currentStreak, 1)).key}" (${pair.currentStreak}).`
+    );
     return;
   }
 
-  await Promise.allSettled(uniqueMessages.map((message) => message.react(guildEmoji).catch(() => null)));
+  const emojiIdentifier = guildEmoji.identifier || guildEmoji.toString();
+
+  await Promise.allSettled(uniqueMessages.map(async (message) => {
+    const me = message.guild.members.me || await message.guild.members.fetchMe().catch(() => null);
+    const permissions = me ? message.channel.permissionsFor(me) : null;
+
+    if (!permissions?.has(PermissionFlagsBits.AddReactions)) {
+      console.warn(`Missing AddReactions permission for streak reaction in channel ${message.channel.id}.`);
+      return null;
+    }
+
+    if (!permissions.has(PermissionFlagsBits.ReadMessageHistory)) {
+      console.warn(`Missing ReadMessageHistory permission for streak reaction in channel ${message.channel.id}.`);
+      return null;
+    }
+
+    if (!permissions.has(PermissionFlagsBits.UseExternalEmojis)) {
+      console.warn(`Missing UseExternalEmojis permission for streak reaction in channel ${message.channel.id}.`);
+      return null;
+    }
+
+    return message.react(emojiIdentifier).catch((error) => {
+      console.error(
+        `Failed to react with streak tier emoji ${emojiIdentifier} on message ${message.id}:`,
+        error
+      );
+      return null;
+    });
+  }));
 }
 
 async function sendStreakNotificationToChannel(channel, pair) {
@@ -698,8 +764,7 @@ async function buildStreakTopBoardData(guild, client) {
 async function buildStreakInfoEmbed(guild, client, targetMember, requestedPage = 1) {
   const data = await buildStreakInfoData(guild, client, targetMember, requestedPage);
   const todayDateKey = getTodayDateKey(data.timezone);
-  const emojiCollection = await guild.emojis.fetch().catch(() => guild.emojis.cache);
-  const emojiByName = new Map(emojiCollection.map((emoji) => [emoji.name, emoji]));
+  const emojiCollection = await fetchApplicationTierEmojis(client);
 
   if (!data.totalPartners) {
     return new EmbedBuilder()
@@ -714,7 +779,7 @@ async function buildStreakInfoEmbed(guild, client, targetMember, requestedPage =
 
   const lines = data.entries.map((entry) => {
     const tier = entry.tier;
-    const tierEmoji = emojiByName.get(tier.emojiName)?.toString() || "🔥";
+    const tierEmoji = getTierEmojiDisplay(emojiCollection, tier);
     const statusLabel = entry.completedToday && data.page && todayDateKey ? "✅ Nyala Hari Ini" : "❌ Belum Nyala 😴";
 
     return `#${entry.rank} ${entry.partnerName} - ${entry.currentStreak} ${tierEmoji} (${entry.bestStreak}) - ${statusLabel}`;

@@ -6,6 +6,9 @@ const {
 const { refreshAllMusicBoards } = require("../modules/music/musicBoardSystem");
 const { startStreakTopBoardScheduler } = require("../modules/streak/streakSystem");
 const { bootstrapTempVoiceRooms } = require("../modules/temp-voice/tempVoiceSystem");
+const { startCustomRoleScheduler } = require("../modules/custom-roles/customRoleSystem");
+const { startShopEconomyScheduler } = require("../modules/shop/shopSystem");
+const { startPrivateRoomScheduler } = require("../modules/private-rooms/privateRoomSystem");
 
 module.exports = {
   name: "clientReady",
@@ -47,6 +50,9 @@ module.exports = {
 
     startStreakTopBoardScheduler(client);
     startLeaderboardScheduler(client);
+    startCustomRoleScheduler(client);
+    startShopEconomyScheduler(client);
+    startPrivateRoomScheduler(client);
     await refreshAllMusicBoards(client).catch((error) => {
       console.error("Failed to refresh music boards:", error);
     });

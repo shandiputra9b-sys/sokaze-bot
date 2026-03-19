@@ -16,6 +16,11 @@ const {
   getNameRequest,
   updateNameRequest
 } = require("../../services/nameRequestStore");
+const {
+  formatRelativeCooldown,
+  getDirectRenameAccess,
+  markDirectRenameUsed
+} = require("../levels/levelSystem");
 
 const NAME_REQUEST_BUTTON_ID = "namerequest:new";
 const NAME_REQUEST_MODAL_ID = "namerequest:modal:new";
@@ -45,7 +50,8 @@ function buildNameRequestPanel(client, guildId) {
         .setDescription(
           [
             "Gunakan tombol di bawah untuk mengajukan nama atau nickname yang ingin kamu pakai.",
-            "Request akan masuk ke tim staff untuk ditinjau terlebih dahulu."
+            "Request akan masuk ke tim staff untuk ditinjau terlebih dahulu.",
+            "Member level 2 ke atas bisa ganti nama langsung lewat bot sesuai cooldown level."
           ].join("\n")
         )
     ],
@@ -183,8 +189,9 @@ async function sendNameRequestLog(guild, client, request, action, moderatorId = 
 
 async function submitNameRequest(interaction, client) {
   const { nameRequests } = getEffectiveGuildSettings(interaction.guildId, client);
+  const renameAccess = getDirectRenameAccess(interaction.guildId, interaction.user.id);
 
-  if (!nameRequests.reviewChannelId) {
+  if (!renameAccess.renameEnabled && !nameRequests.reviewChannelId) {
     return {
       ok: false,
       reason: "Review channel untuk request name belum diatur."
@@ -221,6 +228,57 @@ async function submitNameRequest(interaction, client) {
     return {
       ok: false,
       reason: "Nama yang kamu ajukan terlalu menyerupai admin atau staff."
+    };
+  }
+
+  if (renameAccess.renameEnabled) {
+    if (renameAccess.cooldownMs > 0) {
+      return {
+        ok: false,
+        reason: `Fast rename untuk level kamu belum siap. Coba lagi dalam ${formatRelativeCooldown(renameAccess.cooldownMs)}.`
+      };
+    }
+
+    const member = await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+
+    if (!member) {
+      return {
+        ok: false,
+        reason: "Member tidak ditemukan di server."
+      };
+    }
+
+    const renamed = await member.setNickname(
+      requestedName,
+      `Direct rename via level benefit (${renameAccess.code})`
+    ).then(() => true).catch(() => false);
+
+    if (!renamed) {
+      return {
+        ok: false,
+        reason: "Bot gagal mengganti nama kamu langsung. Pastikan role bot lebih tinggi dan permission Manage Nicknames aktif."
+      };
+    }
+
+    const request = createNameRequest({
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
+      requestedName,
+      note,
+      status: "direct-approved",
+      createdAt: new Date().toISOString(),
+      reviewMessageId: "",
+      handledBy: interaction.user.id,
+      handledAt: new Date().toISOString()
+    });
+
+    markDirectRenameUsed(interaction.guildId, interaction.user.id);
+    await sendNameRequestLog(interaction.guild, client, request, "Direct Approved", interaction.user.id);
+
+    return {
+      ok: true,
+      id: request.id,
+      direct: true
     };
   }
 

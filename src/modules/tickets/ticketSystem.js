@@ -7,6 +7,7 @@ const {
   PermissionFlagsBits
 } = require("discord.js");
 const { getEffectiveGuildSettings } = require("../../utils/guildSettings");
+const { getTicketPriorityFlair } = require("../levels/levelSystem");
 
 const CLOSE_TICKET_BUTTON_ID = "ticket:close";
 const TICKET_TYPE_PREFIX = "ticket:type:";
@@ -18,6 +19,7 @@ const TICKET_TYPES = [
   { key: "laporan", label: "Laporan", emoji: "\uD83D\uDEA8", style: ButtonStyle.Danger, panel: "main" },
   { key: "pasang-iklan", label: "Pasang Iklan", emoji: "\uD83D\uDCE2", style: ButtonStyle.Success, panel: "main" },
   { key: "media-partner", label: "Media Partner", emoji: "\uD83D\uDCE1", style: ButtonStyle.Primary, panel: "main" },
+  { key: "custom-role", label: "Custom Role", emoji: "\u2728", style: ButtonStyle.Primary, panel: "custom-role" },
   { key: "partnership", label: "Partnership", emoji: "\uD83E\uDD1D", style: ButtonStyle.Success, panel: "partnership" }
 ];
 
@@ -158,7 +160,7 @@ function buildTicketCloseRow() {
   );
 }
 
-function buildTicketOpenedEmbed(user, supportRoleId, ticketType) {
+function buildTicketOpenedEmbed(user, supportRoleId, ticketType, ticketFlair = "") {
   const supportLine = supportRoleId ? `<@&${supportRoleId}>` : "Tim support belum diatur.";
 
   return new EmbedBuilder()
@@ -167,12 +169,13 @@ function buildTicketOpenedEmbed(user, supportRoleId, ticketType) {
     .setDescription(
       [
         `${user}, tiketmu sudah dibuka.`,
+        ticketFlair ? `Priority Flair: **${ticketFlair}**` : null,
         `Jenis tiket: **${ticketType.label}**`,
         `Support: ${supportLine}`,
         "",
         "Jelaskan kebutuhanmu dengan jelas agar tim bisa bantu lebih cepat.",
         "Template detail akan dikirim lewat command `sksupport`."
-      ].join("\n")
+      ].filter(Boolean).join("\n")
     );
 }
 
@@ -257,9 +260,11 @@ async function createTicketChannel(interaction, client, ticketTypeKey) {
     ]
   });
 
+  const ticketFlair = getTicketPriorityFlair(interaction.guildId, interaction.user.id);
+
   await ticketChannel.send({
     content: tickets.supportRoleId ? `<@&${tickets.supportRoleId}>` : undefined,
-    embeds: [buildTicketOpenedEmbed(interaction.user, tickets.supportRoleId, ticketType)],
+    embeds: [buildTicketOpenedEmbed(interaction.user, tickets.supportRoleId, ticketType, ticketFlair)],
     components: [buildTicketCloseRow()]
   });
 

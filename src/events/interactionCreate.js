@@ -58,6 +58,10 @@ const {
 const {
   handleDonationModalSubmit
 } = require("../modules/donations/donationSystem");
+const {
+  handleCustomRoleButton,
+  handleCustomRoleModalSubmit
+} = require("../modules/custom-roles/customRoleSystem");
 
 module.exports = {
   name: "interactionCreate",
@@ -111,6 +115,10 @@ module.exports = {
     }
 
     if (interaction.isButton()) {
+      if (await handleCustomRoleButton(interaction, client)) {
+        return;
+      }
+
       if (await handleSuggestionButton(interaction, client)) {
         return;
       }
@@ -223,6 +231,10 @@ module.exports = {
       return;
     }
 
+    if (await handleCustomRoleModalSubmit(interaction, client)) {
+      return;
+    }
+
     if (await handleDonationModalSubmit(interaction, client)) {
       return;
     }
@@ -247,7 +259,9 @@ module.exports = {
       }
 
       await interaction.reply({
-        content: `Request name berhasil dikirim sebagai #${result.id}.`,
+        content: result.direct
+          ? `Nama kamu berhasil diganti langsung lewat benefit level sebagai #${result.id}.`
+          : `Request name berhasil dikirim sebagai #${result.id}.`,
         ephemeral: true
       });
       return;
