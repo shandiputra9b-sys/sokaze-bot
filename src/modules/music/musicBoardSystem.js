@@ -125,7 +125,7 @@ function buildMusicBoardEmbed(guild, entries) {
       `${AVAILABLE_ICON} **Tersedia:** ${availableEntries.length}`,
       `${BUSY_ICON} **Sedang Dipakai:** ${busyEntries.length}`,
       "",
-      "Status akan update otomatis saat music bot masuk, pindah, atau keluar dari voice."
+      "Auto update saat music bot pindah voice."
     ].join("\n"))
     .addFields(fields)
     .setFooter({
