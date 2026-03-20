@@ -186,7 +186,7 @@ async function findExistingTicketChannel(guild, userId) {
   ) || null;
 }
 
-async function createTicketChannel(interaction, client, ticketTypeKey) {
+async function createTicketChannel(interaction, client, ticketTypeKey, options = {}) {
   const { tickets } = getEffectiveGuildSettings(interaction.guildId, client);
   const ticketType = getTicketType(ticketTypeKey);
   const guildSettings = getGuildSettings(interaction.guildId, {
@@ -195,12 +195,14 @@ async function createTicketChannel(interaction, client, ticketTypeKey) {
     }
   });
   const customRoleCategoryId = guildSettings.customRoles?.ticketCategoryId || "";
+  const categoryIdOverride = String(options.categoryIdOverride || "").trim();
 
-  const targetCategoryId = ticketType?.key === "partnership"
+  const targetCategoryId = categoryIdOverride
+    || (ticketType?.key === "partnership"
     ? tickets.partnershipCategoryId
     : ticketType?.key === "custom-role" && customRoleCategoryId
       ? customRoleCategoryId
-    : tickets.categoryId;
+      : tickets.categoryId);
 
   if (!targetCategoryId) {
     return {

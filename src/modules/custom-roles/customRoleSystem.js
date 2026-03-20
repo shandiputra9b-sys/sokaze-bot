@@ -916,7 +916,10 @@ async function claimCustomRole(interaction, client) {
     return true;
   }
 
-  const result = await createTicketChannel(interaction, client, "custom-role");
+  const customRoleSettings = getCustomRoleSettings(interaction.guildId);
+  const result = await createTicketChannel(interaction, client, "custom-role", {
+    categoryIdOverride: customRoleSettings.ticketCategoryId
+  });
 
   if (!result.ok) {
     await interaction.reply({
