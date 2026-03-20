@@ -28,6 +28,8 @@ const NAME_REQUEST_APPROVE_PREFIX = "namerequest:approve:";
 const NAME_REQUEST_REJECT_PREFIX = "namerequest:reject:";
 const NAME_REQUEST_INPUT_ID = "namerequest_name";
 const NAME_REQUEST_NOTE_ID = "namerequest_note";
+const NAME_REQUEST_MIN_LENGTH = 3;
+const NAME_REQUEST_MAX_LENGTH = 32;
 
 const NSFW_BLOCKLIST = [
   "anjing", "kontol", "memek", "ngentot", "jilboob", "sange", "horny", "fuck", "bitch", "porn", "nsfw"
@@ -76,8 +78,8 @@ function buildNameRequestModal() {
           .setCustomId(NAME_REQUEST_INPUT_ID)
           .setLabel("Nama yang diinginkan")
           .setRequired(true)
-          .setMinLength(3)
-          .setMaxLength(20)
+          .setMinLength(NAME_REQUEST_MIN_LENGTH)
+          .setMaxLength(NAME_REQUEST_MAX_LENGTH)
           .setStyle(TextInputStyle.Short)
       ),
       new ActionRowBuilder().addComponents(
@@ -210,10 +212,10 @@ async function submitNameRequest(interaction, client) {
   const requestedName = interaction.fields.getTextInputValue(NAME_REQUEST_INPUT_ID).trim().replace(/\s+/g, " ");
   const note = interaction.fields.getTextInputValue(NAME_REQUEST_NOTE_ID)?.trim() || "";
 
-  if (requestedName.length < 3 || requestedName.length > 20) {
+  if (requestedName.length < NAME_REQUEST_MIN_LENGTH || requestedName.length > NAME_REQUEST_MAX_LENGTH) {
     return {
       ok: false,
-      reason: "Nama harus memiliki panjang antara 3 sampai 20 karakter."
+      reason: `Nama harus memiliki panjang antara ${NAME_REQUEST_MIN_LENGTH} sampai ${NAME_REQUEST_MAX_LENGTH} karakter.`
     };
   }
 
