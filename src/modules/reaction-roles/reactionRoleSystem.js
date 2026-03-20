@@ -16,6 +16,26 @@ const {
 
 const ROLE_PANEL_SELECT_PREFIX = "rolepanel:select:";
 const ROLE_PANEL_OPTION_LIMIT = 25;
+const GAME_ROLE_PANEL_PRESET_KEY = "game-self-role";
+const GAME_ROLE_PANEL_OPTIONS = [
+  { emoji: "<:Bloodstrike:1484573138410012732>", label: "Blood Strike", roleId: "1484571536622092319", description: "Ambil role ini kalau kamu main Blood Strike." },
+  { emoji: "<:Roblox:1484573236829229197>", label: "Roblox", roleId: "1483828827640561735", description: "Ambil role ini kalau kamu main Roblox." },
+  { emoji: "<:GTA5:1484572255295115355>", label: "GTA V", roleId: "1483830806450409674", description: "Ambil role ini kalau kamu main GTA V." },
+  { emoji: "<:WIldRift:1484572328317816894>", label: "League Of Legend", roleId: "1483829133220905001", description: "Ambil role ini kalau kamu main League Of Legend." },
+  { emoji: "<:AmongUs:1484573104402464769>", label: "Among Us", roleId: "1483829507843559554", description: "Ambil role ini kalau kamu main Among Us." },
+  { emoji: "<:FreeFire:1484572125615624295>", label: "Free Fire", roleId: "1483828185064804464", description: "Ambil role ini kalau kamu main Free Fire." },
+  { emoji: "<:mobilelegend:1484571623808962771>", label: "Mobile Legend", roleId: "1483828579111403530", description: "Ambil role ini kalau kamu main Mobile Legend." },
+  { emoji: "<:PUBG:1484575124156973156>", label: "PUBG", roleId: "1483831229483843726", description: "Ambil role ini kalau kamu main PUBG." },
+  { emoji: "<:DotA2:1484575182294094003>", label: "Dota 2", roleId: "1483829808269103224", description: "Ambil role ini kalau kamu main Dota 2." },
+  { emoji: "<:eFootball:1484575057240920284>", label: "Efootball", roleId: "1483830228114739334", description: "Ambil role ini kalau kamu main Efootball." },
+  { emoji: "<:minecraft:1484571584441094194>", label: "Minecraft", roleId: "1483828964068823100", description: "Ambil role ini kalau kamu main Minecraft." },
+  { emoji: "<:genshin:1484575982701514903>", label: "Genshin Impact", roleId: "1483829009195470878", description: "Ambil role ini kalau kamu main Genshin Impact." },
+  { emoji: "<:Growtopia:1484576028004188350>", label: "Growtopia", roleId: "1483830864151314513", description: "Ambil role ini kalau kamu main Growtopia." },
+  { emoji: "<:valorant:1484571699205771314>", label: "Valorant", roleId: "1483828670266212422", description: "Ambil role ini kalau kamu main Valorant." },
+  { emoji: "<:HonorofKings:1484576518981292233>", label: "Honor Of Kings", roleId: "1483831109752979536", description: "Ambil role ini kalau kamu main Honor Of Kings." },
+  { emoji: "<:CODM:1484576573259649165>", label: "Call Of Duty Mobile", roleId: "1484571400009154642", description: "Ambil role ini kalau kamu main Call Of Duty Mobile." },
+  { emoji: "<:WhereWindsMeet:1484576747100831744>", label: "Wheres The Wind Meet", roleId: "1483830903099883571", description: "Ambil role ini kalau kamu main Wheres The Wind Meet." }
+];
 
 function hasRolePanelPermission(member) {
   return member.permissions.has(PermissionFlagsBits.ManageGuild)
@@ -91,20 +111,26 @@ function createReactionRolePanel({
   guildId,
   channelId,
   mode,
+  behavior = "sync",
   title,
   description,
   placeholder,
   imageUrl = "",
+  presetKey = "",
+  presetTag = "",
   createdBy
 }) {
   return createPanel({
     guildId,
     channelId,
     mode,
+    behavior,
     title,
     description,
     placeholder,
     imageUrl,
+    presetKey,
+    presetTag,
     createdBy,
     messageId: "",
     options: [],
@@ -183,9 +209,11 @@ function buildRolePanelMessage(panel, guild) {
       ].join("\n").trim()
     )
     .setFooter({
-      text: panel.mode === "single"
-        ? "Mode: single select"
-        : "Mode: multi select | Pilih semua role yang ingin kamu simpan."
+      text: panel.behavior === "toggle"
+        ? "Mode toggle | Pilih role untuk ambil, pilih lagi untuk melepas."
+        : panel.mode === "single"
+          ? "Mode: single select"
+          : "Mode: multi select | Pilih semua role yang ingin kamu simpan."
     })
     .setTimestamp();
 
@@ -291,7 +319,7 @@ function buildRolePanelsEmbed(guild, panels) {
       const state = panel.messageId ? "deployed" : "draft";
       return [
         `**#${panel.id}** ${panel.title}`,
-        `Mode: \`${panel.mode}\` | Opsi: **${panel.options.length}** | Status: \`${state}\` | Banner: ${panel.imageUrl ? "`on`" : "`off`"}`,
+        `Mode: \`${panel.mode}\` | Behavior: \`${panel.behavior || "sync"}\` | Opsi: **${panel.options.length}** | Status: \`${state}\` | Banner: ${panel.imageUrl ? "`on`" : "`off`"}`,
         `Channel: <#${panel.channelId}>`
       ].join("\n");
     }).join("\n\n")
@@ -320,7 +348,7 @@ function buildRolePanelDetailEmbed(guild, panel) {
       },
       {
         name: "Mode",
-        value: panel.mode,
+        value: `${panel.mode} / ${panel.behavior || "sync"}`,
         inline: true
       },
       {
@@ -418,12 +446,17 @@ async function handleRolePanelSelect(interaction) {
     return true;
   }
 
-  const rolesToRemove = involvedRoles.filter((role) =>
-    interaction.member.roles.cache.has(role.id) && !selectedRoleIds.includes(role.id)
-  );
-  const rolesToAdd = involvedRoles.filter((role) =>
-    selectedRoleIds.includes(role.id) && !interaction.member.roles.cache.has(role.id)
-  );
+  const toggleMode = panel.behavior === "toggle";
+  const rolesToRemove = toggleMode
+    ? involvedRoles.filter((role) => selectedRoleIds.includes(role.id) && interaction.member.roles.cache.has(role.id))
+    : involvedRoles.filter((role) =>
+      interaction.member.roles.cache.has(role.id) && !selectedRoleIds.includes(role.id)
+    );
+  const rolesToAdd = toggleMode
+    ? involvedRoles.filter((role) => selectedRoleIds.includes(role.id) && !interaction.member.roles.cache.has(role.id))
+    : involvedRoles.filter((role) =>
+      selectedRoleIds.includes(role.id) && !interaction.member.roles.cache.has(role.id)
+    );
   const removedRoles = [];
   const addedRoles = [];
 
@@ -450,7 +483,9 @@ async function handleRolePanelSelect(interaction) {
         .setTitle("Role Panel Updated")
         .setDescription(buildRoleAssignmentSummary(addedRoles, removedRoles))
         .setFooter({
-          text: panel.mode === "multi"
+          text: panel.behavior === "toggle"
+            ? "Mode toggle: pilih role untuk ambil, pilih lagi role yang sama untuk melepas."
+            : panel.mode === "multi"
             ? "Mode multi-select: pilih semua role yang ingin kamu simpan di panel ini."
             : "Mode single-select: hanya satu role dari panel ini yang bisa aktif."
         })
@@ -462,7 +497,93 @@ async function handleRolePanelSelect(interaction) {
   return true;
 }
 
+async function upsertGameRolePanel(guild, channelId) {
+  const existing = getGuildPanels(guild.id).find((panel) => panel.presetKey === GAME_ROLE_PANEL_PRESET_KEY) || null;
+  const missingRoles = [];
+  const unmanageableRoles = [];
+  const options = [];
+
+  for (const entry of GAME_ROLE_PANEL_OPTIONS) {
+    const role = guild.roles.cache.get(entry.roleId) || await guild.roles.fetch(entry.roleId).catch(() => null);
+
+    if (!role) {
+      missingRoles.push(entry.label);
+      continue;
+    }
+
+    if (!isRoleManageable(role, guild)) {
+      unmanageableRoles.push(role.name);
+      continue;
+    }
+
+    options.push({
+      roleId: role.id,
+      label: entry.label,
+      description: entry.description,
+      emoji: entry.emoji,
+      emojiData: parseRoleOptionEmoji(entry.emoji)
+    });
+  }
+
+  if (missingRoles.length) {
+    return {
+      ok: false,
+      reason: `Role game ini tidak ditemukan: ${missingRoles.join(", ")}`
+    };
+  }
+
+  if (unmanageableRoles.length) {
+    return {
+      ok: false,
+      reason: `Role game ini belum bisa dikelola bot: ${unmanageableRoles.join(", ")}`
+    };
+  }
+
+  const payload = {
+    guildId: guild.id,
+    channelId,
+    mode: "multi",
+    behavior: "toggle",
+    title: "Game Self Role",
+    description: [
+      "Pilih role game yang kamu mainkan dari dropdown di bawah.",
+      "Kalau mau lepas role, cukup pilih role yang sama lagi."
+    ].join("\n"),
+    placeholder: "Pilih game kamu di sini",
+    presetKey: GAME_ROLE_PANEL_PRESET_KEY,
+    presetTag: "game-self-role",
+    options
+  };
+
+  if (!existing) {
+    const created = createReactionRolePanel({
+      ...payload,
+      createdBy: guild.client.user?.id || "system"
+    });
+
+    return {
+      ok: true,
+      panel: updatePanel(created.id, (current) => ({
+        ...current,
+        options
+      }))
+    };
+  }
+
+  const updated = updateReactionRolePanel(guild.id, existing.id, (current) => ({
+    ...current,
+    ...payload,
+    messageId: current.messageId || ""
+  }));
+
+  return {
+    ok: true,
+    panel: updated
+  };
+}
+
 module.exports = {
+  GAME_ROLE_PANEL_PRESET_KEY,
   ROLE_PANEL_OPTION_LIMIT,
   buildRolePanelDetailEmbed,
   buildRolePanelsEmbed,
@@ -480,5 +601,6 @@ module.exports = {
   parseRoleOptionEmoji,
   splitPipeSegments,
   syncRolePanelMessage,
+  upsertGameRolePanel,
   updateReactionRolePanel
 };

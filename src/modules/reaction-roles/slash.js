@@ -18,6 +18,7 @@ const {
   isValidHttpUrl,
   parseRoleOptionEmoji,
   syncRolePanelMessage,
+  upsertGameRolePanel,
   updateReactionRolePanel
 } = require("./reactionRoleSystem");
 
@@ -306,6 +307,43 @@ async function handleSend(interaction, client) {
   });
 }
 
+async function handleSendGamePanel(interaction, client) {
+  const channel = getTextChannel(interaction);
+
+  if (!channel) {
+    await replyError(interaction, "Channel target harus berupa text channel biasa.");
+    return;
+  }
+
+  const upserted = await upsertGameRolePanel(interaction.guild, channel.id);
+
+  if (!upserted.ok) {
+    await replyError(interaction, upserted.reason);
+    return;
+  }
+
+  const result = await syncRolePanelMessage(client, upserted.panel);
+
+  if (!result.ok) {
+    await replyError(interaction, result.reason);
+    return;
+  }
+
+  await interaction.reply({
+    embeds: [
+      buildSuccessEmbed(
+        "Game Self Role Panel Sent",
+        [
+          `Panel game self role berhasil dikirim ke <#${result.panel.channelId}>.`,
+          `Panel ID: **#${result.panel.id}**`,
+          "Behavior: `toggle`"
+        ].join("\n")
+      )
+    ],
+    ephemeral: true
+  });
+}
+
 async function handleList(interaction) {
   const panelId = interaction.options.getInteger("panel_id");
 
@@ -569,6 +607,18 @@ const slashData = new SlashCommandBuilder()
   )
   .addSubcommand((subcommand) =>
     subcommand
+      .setName("send-game-panel")
+      .setDescription("Kirim panel self role game bawaan Sokaze")
+      .addChannelOption((option) =>
+        option
+          .setName("channel")
+          .setDescription("Channel target panel")
+          .addChannelTypes(ChannelType.GuildText)
+          .setRequired(false)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
       .setName("list")
       .setDescription("Lihat daftar panel atau detail satu panel")
       .addIntegerOption((option) =>
@@ -653,6 +703,11 @@ module.exports = {
 
     if (subcommand === "send") {
       await handleSend(interaction, client);
+      return;
+    }
+
+    if (subcommand === "send-game-panel") {
+      await handleSendGamePanel(interaction, client);
       return;
     }
 
