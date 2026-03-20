@@ -42,6 +42,7 @@ const DEFAULT_CUSTOM_ROLE_SETTINGS = {
   panelChannelId: "",
   panelMessageId: "",
   ticketCategoryId: "",
+  anchorRoleId: "",
   customizeCooldownDays: DEFAULT_CUSTOMIZE_COOLDOWN_DAYS
 };
 
@@ -238,6 +239,28 @@ function canAssignRole(guild, role) {
   return canManageRole(guild, role);
 }
 
+async function resolveAnchorRole(guild) {
+  const settings = getCustomRoleSettings(guild.id);
+  const roleId = settings.anchorRoleId || "";
+
+  if (!roleId) {
+    return null;
+  }
+
+  return guild.roles.cache.get(roleId)
+    || await guild.roles.fetch(roleId).catch(() => null);
+}
+
+async function positionCustomRole(guild, role) {
+  const anchorRole = await resolveAnchorRole(guild);
+  const maxManageablePosition = Math.max(1, guild.members.me.roles.highest.position - 1);
+  const targetPosition = anchorRole
+    ? Math.min(Math.max(1, anchorRole.position - 1), maxManageablePosition)
+    : maxManageablePosition;
+
+  await role.setPosition(targetPosition).catch(() => null);
+}
+
 function buildCustomRolePanelEmbed(guild) {
   return new EmbedBuilder()
     .setColor("#111214")
@@ -339,6 +362,11 @@ function buildCustomRoleStatusEmbed(guild) {
       {
         name: "Kategori Ticket Custom Role",
         value: settings.ticketCategoryId ? `<#${settings.ticketCategoryId}>` : "Belum diatur (pakai kategori ticket umum)",
+        inline: false
+      },
+      {
+        name: "Anchor Role Posisi",
+        value: settings.anchorRoleId ? `<@&${settings.anchorRoleId}>` : "Belum diatur (ikut posisi aman bot)",
         inline: false
       },
       {
@@ -998,15 +1026,14 @@ async function createManagedCustomRole(guild, member, data, entitlement) {
     reason: `Custom role created for ${member.user.tag} (${entitlement.sourceType})`
   });
 
-  const targetPosition = Math.max(1, guild.members.me.roles.highest.position - 1);
-  await created.setPosition(targetPosition).catch(() => null);
+  await positionCustomRole(guild, created);
   await member.roles.add(created, "Assign custom role");
 
   return created;
 }
 
 async function updateManagedCustomRole(role, data, member, entitlement) {
-  return role.edit({
+  const updated = await role.edit({
     name: data.name,
     colors: {
       primaryColor: data.primaryColor,
@@ -1014,6 +1041,9 @@ async function updateManagedCustomRole(role, data, member, entitlement) {
     },
     reason: `Custom role updated for ${member.user.tag} (${entitlement.sourceType})`
   });
+
+  await positionCustomRole(member.guild, updated);
+  return updated;
 }
 
 async function submitCustomRoleModal(interaction, client, mode) {

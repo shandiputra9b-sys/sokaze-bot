@@ -54,6 +54,17 @@ const slashData = new SlashCommandBuilder()
   )
   .addSubcommand((subcommand) =>
     subcommand
+      .setName("set-anchor-role")
+      .setDescription("Atur role acuan posisi custom role")
+      .addRoleOption((option) =>
+        option
+          .setName("role")
+          .setDescription("Custom role akan diletakkan tepat di bawah role ini")
+          .setRequired(true)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
       .setName("cabut-donatur")
       .setDescription("Cabut akses donatur sementara dari member")
       .addUserOption((option) =>
@@ -110,6 +121,21 @@ module.exports = {
 
       await interaction.reply({
         content: `Kategori ticket custom role berhasil diatur ke ${category}.`,
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (subcommand === "set-anchor-role") {
+      const role = interaction.options.getRole("role", true);
+
+      updateCustomRoleSettings(interaction.guildId, (current) => ({
+        ...current,
+        anchorRoleId: role.id
+      }));
+
+      await interaction.reply({
+        content: `Anchor role custom role berhasil diatur ke ${role}. Role custom baru akan dibuat tepat di bawah role ini.`,
         ephemeral: true
       });
       return;
