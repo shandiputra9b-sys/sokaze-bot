@@ -8,6 +8,7 @@ const {
 
 const assetsDirectory = path.join(__dirname, "..", "..", "..", "assets");
 const customFontPath = path.join(assetsDirectory, "font.otf");
+const eclipseBackgroundPath = path.join(assetsDirectory, "profile-eclipse-bg.png");
 
 const regularFontRegistered = GlobalFonts.registerFromPath(customFontPath, "Sokaze Gothic");
 const boldFontRegistered = GlobalFonts.registerFromPath(customFontPath, "Sokaze Gothic Bold");
@@ -68,6 +69,10 @@ function formatNumber(value) {
   return new Intl.NumberFormat("id-ID").format(Math.max(0, Number(value || 0)));
 }
 
+function isMaxTier(levelInfo) {
+  return Number(levelInfo?.level || 0) >= 5 && Number(levelInfo?.remainingXp || 0) <= 0;
+}
+
 async function loadRemoteImage(url) {
   const response = await fetch(url);
 
@@ -88,7 +93,59 @@ async function loadAvatarImage(member) {
   return loadRemoteImage(avatarUrl);
 }
 
-function drawBackground(context, width, height, config) {
+async function loadLocalImage(filePath) {
+  try {
+    return await loadImage(filePath);
+  } catch {
+    return null;
+  }
+}
+
+function getRenderConfig(levelInfo, config) {
+  if (!isMaxTier(levelInfo)) {
+    return config;
+  }
+
+  return {
+    ...config,
+    background: {
+      ...config.background,
+      baseStart: "#140d10",
+      baseEnd: "#050405",
+      border: "rgba(216, 179, 106, 0.18)",
+      accentGlow: "rgba(216, 179, 106, 0.12)"
+    },
+    username: {
+      ...config.username,
+      color: "#f7efe2"
+    },
+    xp: {
+      ...config.xp,
+      color: "#ecd8b0"
+    },
+    level: {
+      ...config.level,
+      color: "#d7c4a5"
+    },
+    progress: {
+      ...config.progress,
+      background: "rgba(255,255,255,0.08)",
+      fillStart: "#6a1f29",
+      fillEnd: "#d8b36a",
+      border: "rgba(216,179,106,0.16)"
+    },
+    badge: {
+      ...config.badge,
+      enabled: config.badge?.enabled !== false,
+      text: "ECLIPSE",
+      fill: "rgba(216,179,106,0.14)",
+      border: "rgba(216,179,106,0.2)",
+      textColor: "#f0e2c4"
+    }
+  };
+}
+
+function drawBackground(context, width, height, config, options = {}) {
   const gradient = context.createLinearGradient(0, 0, width, height);
   gradient.addColorStop(0, config.background.baseStart);
   gradient.addColorStop(1, config.background.baseEnd);
@@ -96,14 +153,23 @@ function drawBackground(context, width, height, config) {
   drawRoundedRect(context, 0, 0, width, height, config.borderRadius);
   context.fill();
 
-  context.save();
-  context.filter = "blur(34px)";
-  const glow = context.createRadialGradient(width - 120, height / 2, 12, width - 120, height / 2, 180);
-  glow.addColorStop(0, config.background.accentGlow);
-  glow.addColorStop(1, "rgba(0,0,0,0)");
-  context.fillStyle = glow;
-  context.fillRect(width - 280, -30, 320, height + 60);
-  context.restore();
+  if (options.backgroundImage) {
+    context.save();
+    drawRoundedRect(context, 0, 0, width, height, config.borderRadius);
+    context.clip();
+    context.globalAlpha = 0.34;
+    context.drawImage(options.backgroundImage, 0, 0, width, height);
+    context.restore();
+  } else {
+    context.save();
+    context.filter = "blur(34px)";
+    const glow = context.createRadialGradient(width - 120, height / 2, 12, width - 120, height / 2, 180);
+    glow.addColorStop(0, config.background.accentGlow);
+    glow.addColorStop(1, "rgba(0,0,0,0)");
+    context.fillStyle = glow;
+    context.fillRect(width - 280, -30, 320, height + 60);
+    context.restore();
+  }
 
   context.strokeStyle = config.background.border;
   context.lineWidth = 1;
@@ -213,14 +279,16 @@ function drawProgress(context, levelInfo, config) {
 }
 
 async function createExpCard(member, levelInfo, configOverride = null) {
-  const config = configOverride
+  const rawConfig = configOverride
     ? normalizeExpCardConfig(configOverride)
     : getExpCardConfig();
+  const config = getRenderConfig(levelInfo, rawConfig);
   const canvas = new Canvas(config.width, config.height);
   const context = canvas.getContext("2d");
   const avatar = await loadAvatarImage(member).catch(() => null);
+  const backgroundImage = isMaxTier(levelInfo) ? await loadLocalImage(eclipseBackgroundPath) : null;
 
-  drawBackground(context, config.width, config.height, config);
+  drawBackground(context, config.width, config.height, config, { backgroundImage });
   drawAvatar(context, avatar, member, config);
   drawTexts(context, member, levelInfo, config);
   drawBadge(context, config);
