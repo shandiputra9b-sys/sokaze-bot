@@ -254,12 +254,12 @@ function buildLevelUpEditorSample(payload = {}) {
     previousLevelInfo: {
       level: previousLevel,
       code: `L${previousLevel}`,
-      name: "Core"
+      name: "Noctis"
     },
     nextLevelInfo: {
       level: nextLevel,
       code: `L${nextLevel}`,
-      name: "Elite"
+      name: "Eclipse"
     }
   };
 }

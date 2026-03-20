@@ -1,18 +1,24 @@
 const { EmbedBuilder, PermissionFlagsBits } = require("discord.js");
 const { getProfileEntry, upsertProfileEntry } = require("../../services/profileStore");
-const { listChatEntries, listDonators, listVoiceTotals, getDonator } = require("../../services/leaderboardStore");
+const { listChatEntries, listDonators, listVoiceTotals, listVoicePairsForUser, getDonator } = require("../../services/leaderboardStore");
 const { listPairs } = require("../../services/streakStore");
 const { getCustomRoleRecord, getDonorGrant } = require("../../services/customRoleStore");
 const { LEVEL_META, getMemberLevelInfo } = require("../levels/levelSystem");
 
 const PROFILE_ACCESS_LEVEL = 3;
+const PROFILE_SONG_LIMITS = {
+  3: 2,
+  4: 4,
+  5: 6
+};
+const PROFILE_BIO_MAX_LENGTH = 140;
 
 const PROFILE_THEMES = [
   {
     key: "midnight",
     label: "Midnight",
     minLevel: 3,
-    kicker: "NOCTURNE BASIC",
+    backgroundAsset: "profile-obscura-bg.png",
     palette: {
       accent: "#77e7d8",
       accentSoft: "rgba(119, 231, 216, 0.18)",
@@ -31,19 +37,22 @@ const PROFILE_THEMES = [
     key: "sunset",
     label: "Sunset",
     minLevel: 4,
-    kicker: "CORE AURORA",
+    backgroundAsset: "profile-noctis-bg.png",
+    backgroundOpacity: 1,
+    vignetteOpacity: 0.06,
+    shellFill: "rgba(11, 14, 20, 0.58)",
     palette: {
-      accent: "#ffb45b",
-      accentSoft: "rgba(255, 180, 91, 0.2)",
-      baseStart: "#2a1220",
-      baseEnd: "#0c0910",
-      glow: "rgba(255, 132, 80, 0.22)",
-      panel: "rgba(36, 14, 22, 0.72)",
-      panelStrong: "rgba(25, 10, 16, 0.86)",
+      accent: "#8fb7ff",
+      accentSoft: "rgba(143, 183, 255, 0.18)",
+      baseStart: "#0d1117",
+      baseEnd: "#05070b",
+      glow: "rgba(143, 183, 255, 0.18)",
+      panel: "rgba(20, 26, 34, 0.54)",
+      panelStrong: "rgba(13, 17, 24, 0.68)",
       line: "rgba(255, 255, 255, 0.08)",
-      textPrimary: "#fff7f2",
-      textSecondary: "#f8d9ca",
-      textMuted: "#c4a89c"
+      textPrimary: "#edf3fb",
+      textSecondary: "#c4cfdd",
+      textMuted: "#8794a6"
     }
   },
   {
@@ -69,7 +78,7 @@ const PROFILE_THEMES = [
     key: "crimson",
     label: "Crimson Crown",
     minLevel: 5,
-    kicker: "ELITE CROWN",
+    backgroundAsset: "profile-eclipse-bg.png",
     palette: {
       accent: "#ff6f88",
       accentSoft: "rgba(255, 111, 136, 0.2)",
@@ -88,7 +97,7 @@ const PROFILE_THEMES = [
     key: "gold",
     label: "Gold Ember",
     minLevel: 5,
-    kicker: "ELITE EMBER",
+    backgroundAsset: "profile-eclipse-bg.png",
     palette: {
       accent: "#ffd166",
       accentSoft: "rgba(255, 209, 102, 0.18)",
@@ -106,13 +115,13 @@ const PROFILE_THEMES = [
 ];
 
 const PROFILE_TITLES = [
-  { key: "regular", label: "Sokaze Regular", minLevel: 3 },
+  { key: "regular", label: "Obscura Signal", minLevel: 3 },
   { key: "nightowl", label: "Night Owl", minLevel: 3 },
   { key: "locallegend", label: "Local Legend", minLevel: 3 },
-  { key: "core", label: "Core Member", minLevel: 4 },
+  { key: "core", label: "Noctis Member", minLevel: 4 },
   { key: "innercircle", label: "Inner Circle", minLevel: 4 },
   { key: "signalkeeper", label: "Signal Keeper", minLevel: 4 },
-  { key: "elite", label: "Elite Aura", minLevel: 5 },
+  { key: "elite", label: "Eclipse Aura", minLevel: 5 },
   { key: "starlit", label: "Starlit One", minLevel: 5 },
   { key: "untouchable", label: "Untouchable", minLevel: 5 }
 ];
@@ -219,6 +228,28 @@ function normalizeUnlockedKeys(values) {
   return [...new Set((values || []).map((value) => String(value || "").trim()).filter(Boolean))];
 }
 
+function normalizeShortText(value, maxLength) {
+  return String(value || "").trim().replace(/\s+/g, " ").slice(0, maxLength);
+}
+
+function normalizeFavoriteSongs(values) {
+  return [...new Set((values || [])
+    .map((value) => normalizeShortText(value, 60))
+    .filter(Boolean))];
+}
+
+function getFavoriteSongLimit(level) {
+  if (level >= 5) {
+    return PROFILE_SONG_LIMITS[5];
+  }
+
+  if (level >= 4) {
+    return PROFILE_SONG_LIMITS[4];
+  }
+
+  return PROFILE_SONG_LIMITS[3];
+}
+
 function getThemeByKey(themeKey) {
   return getAllProfileThemes().find((theme) => theme.key === themeKey) || null;
 }
@@ -252,11 +283,25 @@ function getUnlockedProfileTitles(level, entry = null) {
 }
 
 function getDefaultTheme(level) {
-  return PROFILE_THEMES.find((theme) => level >= theme.minLevel) || PROFILE_THEMES[0];
+  const eligibleThemes = PROFILE_THEMES.filter((theme) => level >= theme.minLevel);
+
+  if (!eligibleThemes.length) {
+    return PROFILE_THEMES[0];
+  }
+
+  const highestMinLevel = Math.max(...eligibleThemes.map((theme) => theme.minLevel));
+  return eligibleThemes.find((theme) => theme.minLevel === highestMinLevel) || eligibleThemes[0];
 }
 
 function getDefaultTitle(level) {
-  return PROFILE_TITLES.find((title) => level >= title.minLevel) || {
+  const eligibleTitles = PROFILE_TITLES.filter((title) => level >= title.minLevel);
+
+  if (eligibleTitles.length) {
+    const highestMinLevel = Math.max(...eligibleTitles.map((title) => title.minLevel));
+    return eligibleTitles.find((title) => title.minLevel === highestMinLevel) || eligibleTitles[0];
+  }
+
+  return {
     key: `level-${level}`,
     label: `${LEVEL_META[level]?.name || "Sokaze Member"}`
   };
@@ -272,6 +317,109 @@ function getProfileVariant(level) {
   }
 
   return "basic";
+}
+
+function getProfileSongSummary(level, entry = null) {
+  const limit = getFavoriteSongLimit(level);
+  return normalizeFavoriteSongs(entry?.favoriteSongs).slice(0, limit);
+}
+
+function updateProfileBio(guildId, userId, bio) {
+  const normalizedBio = normalizeShortText(bio, PROFILE_BIO_MAX_LENGTH);
+  const next = upsertProfileEntry(guildId, userId, {
+    bio: normalizedBio,
+    updatedAt: new Date().toISOString()
+  });
+
+  return {
+    ok: true,
+    bio: next.bio || ""
+  };
+}
+
+function addProfileFavoriteSong(guildId, userId, level, song) {
+  const normalizedSong = normalizeShortText(song, 60);
+
+  if (!normalizedSong) {
+    return {
+      ok: false,
+      reason: "Masukkan judul lagu yang valid."
+    };
+  }
+
+  const entry = getProfileEntry(guildId, userId) || {};
+  const currentSongs = getProfileSongSummary(level, entry);
+
+  if (currentSongs.includes(normalizedSong)) {
+    return {
+      ok: false,
+      reason: "Lagu itu sudah ada di daftar favorit kamu."
+    };
+  }
+
+  const limit = getFavoriteSongLimit(level);
+
+  if (currentSongs.length >= limit) {
+    return {
+      ok: false,
+      reason: `Tier kamu saat ini cuma bisa menyimpan ${limit} lagu favorit.`
+    };
+  }
+
+  const next = upsertProfileEntry(guildId, userId, {
+    favoriteSongs: [...currentSongs, normalizedSong],
+    updatedAt: new Date().toISOString()
+  });
+
+  return {
+    ok: true,
+    songs: normalizeFavoriteSongs(next.favoriteSongs).slice(0, limit)
+  };
+}
+
+function removeProfileFavoriteSong(guildId, userId, level, target) {
+  const entry = getProfileEntry(guildId, userId) || {};
+  const currentSongs = getProfileSongSummary(level, entry);
+
+  if (!currentSongs.length) {
+    return {
+      ok: false,
+      reason: "Daftar lagu favorit kamu masih kosong."
+    };
+  }
+
+  const maybeIndex = Number.parseInt(String(target || "").trim(), 10);
+  const nextSongs = Number.isInteger(maybeIndex) && maybeIndex > 0
+    ? currentSongs.filter((_, index) => index !== (maybeIndex - 1))
+    : currentSongs.filter((song) => song.toLowerCase() !== String(target || "").trim().toLowerCase());
+
+  if (nextSongs.length === currentSongs.length) {
+    return {
+      ok: false,
+      reason: "Lagu target tidak ditemukan. Pakai nomor urut atau judul yang persis."
+    };
+  }
+
+  const next = upsertProfileEntry(guildId, userId, {
+    favoriteSongs: nextSongs,
+    updatedAt: new Date().toISOString()
+  });
+
+  return {
+    ok: true,
+    songs: normalizeFavoriteSongs(next.favoriteSongs).slice(0, getFavoriteSongLimit(level))
+  };
+}
+
+function clearProfileFavoriteSongs(guildId, userId) {
+  upsertProfileEntry(guildId, userId, {
+    favoriteSongs: [],
+    updatedAt: new Date().toISOString()
+  });
+
+  return {
+    ok: true
+  };
 }
 
 function canUseProfileFeature(guildId, userId) {
@@ -420,6 +568,40 @@ function getVoiceMetrics(guildId, userId) {
   };
 }
 
+async function getTopFriendMetrics(guild, userId) {
+  const now = Date.now();
+  const entries = listVoicePairsForUser(guild.id, userId)
+    .map((entry) => {
+      const otherUserId = Array.isArray(entry.userIds)
+        ? entry.userIds.find((item) => item !== userId) || ""
+        : "";
+
+      return {
+        ...entry,
+        otherUserId,
+        effectiveTotalMs: Math.max(0, entry.totalMs || 0) + (entry.activeSession?.startedAt
+          ? Math.max(0, now - new Date(entry.activeSession.startedAt).getTime())
+          : 0)
+      };
+    })
+    .filter((entry) => entry.otherUserId)
+    .sort((left, right) => right.effectiveTotalMs - left.effectiveTotalMs)
+    .slice(0, 5);
+
+  const resolved = await Promise.all(entries.map(async (entry) => {
+    const member = guild.members.cache.get(entry.otherUserId) || await guild.members.fetch(entry.otherUserId).catch(() => null);
+    const displayName = member?.displayName || member?.user?.globalName || member?.user?.username || "Unknown";
+
+    return {
+      userId: entry.otherUserId,
+      displayName,
+      totalMs: entry.effectiveTotalMs
+    };
+  }));
+
+  return resolved;
+}
+
 function getDonationMetrics(guildId, userId) {
   const list = listDonators(guildId);
   const current = getDonator(guildId, userId);
@@ -430,20 +612,45 @@ function getDonationMetrics(guildId, userId) {
   };
 }
 
-function getStreakMetrics(guildId, userId) {
+async function getStreakMetrics(guild, userId) {
   const pairs = listPairs((entry) =>
-    entry.guildId === guildId
+    entry.guildId === guild.id
     && Array.isArray(entry.userIds)
     && entry.userIds.includes(userId)
     && entry.acceptedAt
   );
   const bestStreak = pairs.reduce((max, pair) => Math.max(max, pair.bestStreak || 0), 0);
   const currentTopStreak = pairs.reduce((max, pair) => Math.max(max, pair.currentStreak || 0), 0);
+  const topPartners = await Promise.all(
+    [...pairs]
+      .sort((left, right) => {
+        if ((right.currentStreak || 0) !== (left.currentStreak || 0)) {
+          return (right.currentStreak || 0) - (left.currentStreak || 0);
+        }
+
+        return (right.bestStreak || 0) - (left.bestStreak || 0);
+      })
+      .slice(0, 5)
+      .map(async (pair) => {
+        const partnerId = pair.userIds.find((entryUserId) => entryUserId !== userId) || "";
+        const partnerMember = partnerId
+          ? guild.members.cache.get(partnerId) || await guild.members.fetch(partnerId).catch(() => null)
+          : null;
+
+        return {
+          userId: partnerId,
+          displayName: partnerMember?.displayName || partnerMember?.user?.globalName || partnerMember?.user?.username || "Unknown",
+          currentStreak: pair.currentStreak || 0,
+          bestStreak: pair.bestStreak || 0
+        };
+      })
+  );
 
   return {
     streakPairs: pairs.length,
     bestStreak,
-    currentTopStreak
+    currentTopStreak,
+    streakPartners: topPartners
   };
 }
 
@@ -505,7 +712,9 @@ function buildProfileCatalogEmbed(levelInfo) {
             : "Theme: -",
           lockedTitles.length
             ? `Title: ${lockedTitles.map((title) => `${title.label} (${title.shopOnly ? `Shop L${title.minLevel}` : `L${title.minLevel}`})`).join(", ")}`
-            : "Title: -"
+            : "Title: -",
+          `Slot lagu favorit: ${getFavoriteSongLimit(levelInfo.level)}`,
+          `Bio profile: sampai ${PROFILE_BIO_MAX_LENGTH} karakter`
         ].join("\n"),
         inline: false
       }
@@ -582,8 +791,9 @@ async function buildProfileSnapshot(guild, member) {
   const settings = getEffectiveProfileSettings(guild.id, member.id, levelInfo.level);
   const chatMetrics = getChatMetrics(guild.id, member.id);
   const voiceMetrics = getVoiceMetrics(guild.id, member.id);
+  const topFriends = await getTopFriendMetrics(guild, member.id);
   const donationMetrics = getDonationMetrics(guild.id, member.id);
-  const streakMetrics = getStreakMetrics(guild.id, member.id);
+  const streakMetrics = await getStreakMetrics(guild, member.id);
   const donorGrant = getDonorGrant(guild.id, member.id);
   const customRoleRecord = getCustomRoleRecord(guild.id, member.id);
   const joinedAtLabel = member.joinedAt
@@ -600,6 +810,10 @@ async function buildProfileSnapshot(guild, member) {
     ...donationMetrics,
     ...streakMetrics,
     joinedAtLabel,
+    topFriends,
+    favoriteSongs: getProfileSongSummary(levelInfo.level, settings.entry),
+    bio: normalizeShortText(settings.entry?.bio, PROFILE_BIO_MAX_LENGTH),
+    favoriteSongLimit: getFavoriteSongLimit(levelInfo.level),
     hasDonorGrant: Boolean(donorGrant?.expiresAt && new Date(donorGrant.expiresAt).getTime() > Date.now()),
     hasCustomRole: Boolean(customRoleRecord?.roleId)
   };
@@ -623,11 +837,13 @@ module.exports = {
   PROFILE_TITLES,
   SHOP_PROFILE_THEMES,
   SHOP_PROFILE_TITLES,
+  PROFILE_BIO_MAX_LENGTH,
   buildProfileCatalogEmbed,
   buildProfileSnapshot,
   canUseProfileFeature,
   ensureProfileAccess,
   formatDurationShort,
+  getFavoriteSongLimit,
   getDefaultTheme,
   getDefaultTitle,
   getEffectiveProfileSettings,
@@ -639,8 +855,12 @@ module.exports = {
   getUnlockedProfileThemes,
   getUnlockedProfileTitles,
   hasProfileAdminPermission,
+  addProfileFavoriteSong,
+  clearProfileFavoriteSongs,
+  removeProfileFavoriteSong,
   unlockProfileThemePurchase,
   unlockProfileTitlePurchase,
+  updateProfileBio,
   updateProfileTheme,
   updateProfileTitle
 };

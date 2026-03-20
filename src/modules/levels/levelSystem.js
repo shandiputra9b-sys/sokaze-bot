@@ -11,7 +11,7 @@ const LEVEL_META = {
   1: {
     level: 1,
     code: "L1",
-    name: "Basic",
+    name: "Veil",
     renameCooldownDays: 0,
     renameEnabled: false,
     ticketFlair: ""
@@ -19,7 +19,7 @@ const LEVEL_META = {
   2: {
     level: 2,
     code: "L2",
-    name: "Trusted",
+    name: "Shroud",
     renameCooldownDays: 14,
     renameEnabled: true,
     ticketFlair: ""
@@ -27,7 +27,7 @@ const LEVEL_META = {
   3: {
     level: 3,
     code: "L3",
-    name: "Regular",
+    name: "Obscura",
     renameCooldownDays: 10,
     renameEnabled: true,
     ticketFlair: ""
@@ -35,18 +35,18 @@ const LEVEL_META = {
   4: {
     level: 4,
     code: "L4",
-    name: "Core",
+    name: "Noctis",
     renameCooldownDays: 7,
     renameEnabled: true,
-    ticketFlair: "[L4 CORE]"
+    ticketFlair: "[L4 NOCTIS]"
   },
   5: {
     level: 5,
     code: "L5",
-    name: "Elite",
+    name: "Eclipse",
     renameCooldownDays: 3,
     renameEnabled: true,
-    ticketFlair: "[L5 ELITE]"
+    ticketFlair: "[L5 ECLIPSE]"
   }
 };
 

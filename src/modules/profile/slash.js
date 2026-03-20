@@ -7,8 +7,12 @@ const {
   buildProfileCatalogEmbed,
   buildProfileSnapshot,
   ensureProfileAccess,
+  updateProfileBio,
   updateProfileTheme,
-  updateProfileTitle
+  updateProfileTitle,
+  addProfileFavoriteSong,
+  removeProfileFavoriteSong,
+  clearProfileFavoriteSongs
 } = require("./profileSystem");
 const { createProfileCard } = require("./profileCard");
 
@@ -75,7 +79,45 @@ const slashData = new SlashCommandBuilder()
       });
 
     return builder;
-  });
+  })
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("set-bio")
+      .setDescription("Atur bio singkat di profile card kamu")
+      .addStringOption((option) =>
+        option
+          .setName("text")
+          .setDescription("Isi strip jika ingin mengosongkan bio")
+          .setRequired(true)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("add-song")
+      .setDescription("Tambah lagu favorit ke profile kamu")
+      .addStringOption((option) =>
+        option
+          .setName("song")
+          .setDescription("Judul lagu favorit")
+          .setRequired(true)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("remove-song")
+      .setDescription("Hapus lagu favorit dari profile kamu")
+      .addStringOption((option) =>
+        option
+          .setName("target")
+          .setDescription("Nomor urut atau judul lagu")
+          .setRequired(true)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("clear-songs")
+      .setDescription("Kosongkan semua lagu favorit di profile kamu")
+  );
 
 module.exports = {
   slashData,
@@ -140,6 +182,65 @@ module.exports = {
         content: result.ok
           ? `Title profile kamu diganti ke **${result.title.label}**.`
           : result.reason,
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (subcommand === "set-bio") {
+      const rawText = interaction.options.getString("text", true);
+      const normalized = ["-", "clear", "reset", "none"].includes(rawText.trim().toLowerCase()) ? "" : rawText;
+      const result = updateProfileBio(interaction.guildId, interaction.user.id, normalized);
+
+      await interaction.reply({
+        content: result.bio
+          ? `Bio profile kamu diupdate ke:\n> ${result.bio}`
+          : "Bio profile kamu berhasil dikosongkan.",
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (subcommand === "add-song") {
+      const snapshot = await buildProfileSnapshot(interaction.guild, interaction.member);
+      const result = addProfileFavoriteSong(
+        interaction.guildId,
+        interaction.user.id,
+        snapshot.levelInfo.level,
+        interaction.options.getString("song", true)
+      );
+
+      await interaction.reply({
+        content: result.ok
+          ? `Lagu favorit ditambahkan. Slot terpakai: ${result.songs.length}/${snapshot.metrics.favoriteSongLimit}.`
+          : result.reason,
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (subcommand === "remove-song") {
+      const snapshot = await buildProfileSnapshot(interaction.guild, interaction.member);
+      const result = removeProfileFavoriteSong(
+        interaction.guildId,
+        interaction.user.id,
+        snapshot.levelInfo.level,
+        interaction.options.getString("target", true)
+      );
+
+      await interaction.reply({
+        content: result.ok
+          ? `Lagu favorit dihapus. Sisa slot terpakai: ${result.songs.length}/${snapshot.metrics.favoriteSongLimit}.`
+          : result.reason,
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (subcommand === "clear-songs") {
+      clearProfileFavoriteSongs(interaction.guildId, interaction.user.id);
+      await interaction.reply({
+        content: "Semua lagu favorit di profile kamu berhasil dikosongkan.",
         ephemeral: true
       });
       return;

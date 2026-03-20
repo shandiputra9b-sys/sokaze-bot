@@ -1,16 +1,25 @@
+const path = require("node:path");
 const { AttachmentBuilder } = require("discord.js");
 const { Canvas, GlobalFonts, loadImage } = require("@napi-rs/canvas");
 const { formatDurationShort } = require("./profileSystem");
 
+const displayFontRegistered = GlobalFonts.registerFromPath(
+  path.resolve(__dirname, "..", "..", "..", "assets", "font.otf"),
+  "Sokaze Display"
+);
 const regularFontRegistered = GlobalFonts.registerFromPath("C:\\Windows\\Fonts\\segoeui.ttf", "Segoe UI");
 const boldFontRegistered = GlobalFonts.registerFromPath("C:\\Windows\\Fonts\\segoeuib.ttf", "Segoe UI Bold");
 
-function getFontFamily(weight = "normal") {
+function getBodyFont(weight = "normal") {
   if (weight === "bold" && boldFontRegistered) {
     return "Segoe UI Bold";
   }
 
   return regularFontRegistered ? "Segoe UI" : "sans-serif";
+}
+
+function getDisplayFont() {
+  return displayFontRegistered ? "Sokaze Display" : getBodyFont("bold");
 }
 
 function drawRoundedRect(context, x, y, width, height, radius) {
@@ -43,7 +52,7 @@ function fitText(context, value, maxWidth, fallback = "-") {
   return `${trimmed}...`;
 }
 
-function wrapText(context, text, maxWidth) {
+function wrapText(context, text, maxWidth, maxLines = 3) {
   const tokens = String(text || "").split(/\s+/).filter(Boolean);
 
   if (!tokens.length) {
@@ -53,7 +62,8 @@ function wrapText(context, text, maxWidth) {
   const lines = [];
   let current = tokens.shift();
 
-  for (const token of tokens) {
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = tokens[index];
     const nextValue = `${current} ${token}`;
 
     if (context.measureText(nextValue).width <= maxWidth) {
@@ -63,10 +73,31 @@ function wrapText(context, text, maxWidth) {
 
     lines.push(current);
     current = token;
+
+    if (lines.length >= maxLines - 1) {
+      const remainder = [current, ...tokens.slice(index + 1)].join(" ");
+      let finalLine = remainder;
+
+      while (finalLine.length > 1 && context.measureText(finalLine).width > maxWidth) {
+        finalLine = `${finalLine.slice(0, -1).trim()}...`;
+      }
+
+      lines.push(finalLine);
+      return lines.slice(0, maxLines);
+    }
   }
 
-  lines.push(current);
-  return lines;
+  if (current) {
+    let finalLine = current;
+
+    while (finalLine.length > 1 && context.measureText(finalLine).width > maxWidth) {
+      finalLine = `${finalLine.slice(0, -1).trim()}...`;
+    }
+
+    lines.push(finalLine);
+  }
+
+  return lines.slice(0, maxLines);
 }
 
 async function loadRemoteImage(url) {
@@ -89,70 +120,73 @@ async function loadAvatarImage(member) {
   return loadRemoteImage(avatarUrl);
 }
 
-function drawBackground(context, width, height, theme) {
+async function loadThemeBackground(theme) {
+  const relativePath = String(theme?.backgroundAsset || "").trim();
+
+  if (!relativePath) {
+    return null;
+  }
+
+  const absolutePath = path.resolve(__dirname, "..", "..", "..", "assets", relativePath);
+
+  try {
+    return await loadImage(absolutePath);
+  } catch {
+    return null;
+  }
+}
+
+function drawBackground(context, width, height, theme, backgroundImage = null) {
+  if (backgroundImage) {
+    context.imageSmoothingEnabled = true;
+    context.save();
+    context.globalAlpha = 1;
+    context.drawImage(backgroundImage, 0, 0, width, height);
+    context.restore();
+
+    return;
+  }
+
   const baseGradient = context.createLinearGradient(0, 0, width, height);
   baseGradient.addColorStop(0, theme.palette.baseStart);
   baseGradient.addColorStop(1, theme.palette.baseEnd);
   context.fillStyle = baseGradient;
   context.fillRect(0, 0, width, height);
-
-  context.save();
-  context.filter = "blur(54px)";
-  const glowA = context.createRadialGradient(150, 120, 20, 150, 120, 220);
-  glowA.addColorStop(0, theme.palette.glow);
-  glowA.addColorStop(1, "rgba(0, 0, 0, 0)");
-  context.fillStyle = glowA;
-  context.fillRect(-40, -20, 420, 360);
-
-  const glowB = context.createRadialGradient(width - 180, height - 140, 20, width - 180, height - 140, 240);
-  glowB.addColorStop(0, theme.palette.glow);
-  glowB.addColorStop(1, "rgba(0, 0, 0, 0)");
-  context.fillStyle = glowB;
-  context.fillRect(width - 440, height - 360, 460, 360);
-  context.restore();
-
-  context.strokeStyle = "rgba(255, 255, 255, 0.04)";
-  context.lineWidth = 1;
-  drawRoundedRect(context, 20, 20, width - 40, height - 40, 30);
-  context.stroke();
 }
 
 function drawShell(context, width, height, theme) {
-  context.fillStyle = theme.palette.panelStrong;
-  drawRoundedRect(context, 28, 28, width - 56, height - 56, 28);
+  context.fillStyle = theme.shellFill || "rgba(14, 17, 20, 0.78)";
+  drawRoundedRect(context, 28, 28, width - 56, height - 56, 30);
   context.fill();
 
-  context.strokeStyle = theme.palette.line;
-  context.lineWidth = 1;
-  drawRoundedRect(context, 28, 28, width - 56, height - 56, 28);
+  context.strokeStyle = "rgba(255,255,255,0.06)";
+  context.lineWidth = 1.2;
+  drawRoundedRect(context, 28, 28, width - 56, height - 56, 30);
   context.stroke();
 
   context.fillStyle = theme.palette.accent;
-  drawRoundedRect(context, 44, 44, 6, height - 88, 3);
+  drawRoundedRect(context, 46, 46, 4, height - 92, 2);
   context.fill();
 }
 
-function drawPanel(context, x, y, width, height, theme) {
-  context.fillStyle = theme.palette.panel;
-  drawRoundedRect(context, x, y, width, height, 22);
+function drawPanel(context, x, y, width, height, theme, strong = false) {
+  context.fillStyle = strong ? theme.palette.panelStrong : theme.palette.panel;
+  drawRoundedRect(context, x, y, width, height, 24);
   context.fill();
   context.strokeStyle = theme.palette.line;
   context.lineWidth = 1;
-  drawRoundedRect(context, x, y, width, height, 22);
+  drawRoundedRect(context, x, y, width, height, 24);
   context.stroke();
 }
 
 function drawAvatar(context, avatar, member, theme) {
-  const x = 76;
-  const y = 78;
-  const size = 118;
-  const centerX = x + (size / 2);
-  const centerY = y + (size / 2);
+  const x = 72;
+  const y = 68;
+  const size = 116;
+  const radius = 28;
 
   context.save();
-  context.beginPath();
-  context.arc(centerX, centerY, size / 2, 0, Math.PI * 2);
-  context.closePath();
+  drawRoundedRect(context, x, y, size, size, radius);
   context.clip();
 
   if (avatar) {
@@ -166,261 +200,248 @@ function drawAvatar(context, avatar, member, theme) {
     context.fillStyle = "#ffffff";
     context.textAlign = "center";
     context.textBaseline = "middle";
-    context.font = `bold 48px "${getFontFamily("bold")}"`;
-    context.fillText((member.displayName || member.user.username).charAt(0).toUpperCase(), centerX, centerY + 2);
+    context.font = `52px "${getDisplayFont()}"`;
+    context.fillText((member.displayName || member.user.username).charAt(0).toUpperCase(), x + (size / 2), y + (size / 2) + 6);
     context.textAlign = "start";
     context.textBaseline = "alphabetic";
   }
 
   context.restore();
 
-  const ring = context.createLinearGradient(x, y, x + size, y + size);
-  ring.addColorStop(0, theme.palette.accent);
-  ring.addColorStop(1, "rgba(255,255,255,0.6)");
-  context.strokeStyle = ring;
-  context.lineWidth = 4;
-  context.beginPath();
-  context.arc(centerX, centerY, (size / 2) - 2, 0, Math.PI * 2);
+  context.strokeStyle = theme.palette.accent;
+  context.lineWidth = 2;
+  drawRoundedRect(context, x, y, size, size, radius);
   context.stroke();
+}
+
+function drawChip(context, x, y, label, theme, wide = false) {
+  context.font = `15px "${getBodyFont("bold")}"`;
+  const width = Math.max(wide ? 150 : 110, context.measureText(label).width + 28);
+  context.fillStyle = theme.palette.accentSoft;
+  drawRoundedRect(context, x, y, width, 34, 17);
+  context.fill();
+  context.strokeStyle = theme.palette.line;
+  drawRoundedRect(context, x, y, width, 34, 17);
+  context.stroke();
+  context.fillStyle = theme.palette.textPrimary;
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(label, x + (width / 2), y + 18);
+  context.textAlign = "start";
+  context.textBaseline = "alphabetic";
+  return width;
 }
 
 function drawHeader(context, snapshot) {
-  const { member, levelInfo, theme, title, variant } = snapshot;
-  const chipX = 900;
-  const chipY = 82;
-
-  context.fillStyle = theme.palette.textSecondary;
-  context.font = `bold 18px "${getFontFamily("bold")}"`;
-  context.fillText(theme.kicker || "SOKAZE PROFILE", 226, 84);
+  const { member, theme, title, levelInfo, metrics } = snapshot;
+  const displayName = member.displayName || member.user.username;
 
   context.fillStyle = theme.palette.textPrimary;
-  context.font = `bold 42px "${getFontFamily("bold")}"`;
-  context.fillText(fitText(context, member.displayName || member.user.username, 530), 226, 128);
+  context.font = `44px "${getDisplayFont()}"`;
+  context.fillText(fitText(context, displayName, 460), 214, 108);
 
   context.fillStyle = theme.palette.textSecondary;
-  context.font = `18px "${getFontFamily()}"`;
-  context.fillText(`@${fitText(context, member.user.username, 250)}`, 226, 158);
-
-  context.fillStyle = theme.palette.accent;
-  context.font = `bold 22px "${getFontFamily("bold")}"`;
-  context.fillText(title.label, 226, 194);
+  context.font = `20px "${getBodyFont()}"`;
+  context.fillText(`@${fitText(context, member.user.username, 260)}`, 216, 146);
 
   context.fillStyle = theme.palette.textMuted;
-  context.font = `16px "${getFontFamily()}"`;
-  context.fillText(
-    variant === "premium"
-      ? "Premium profile card unlocked lewat loyalitas tertinggi di Sokaze."
-      : variant === "advanced"
-        ? "Advanced card buat member inti yang sudah naik ke level lebih tinggi."
-        : "Basic card buat member yang mulai buka prestige benefit.",
-    226,
-    224
+  context.font = `17px "${getBodyFont()}"`;
+  context.fillText(`Masuk Sokaze sejak ${metrics.joinedAtLabel}`, 216, 176);
+
+  const titleWidth = drawChip(context, 214, 194, title.label, theme, true);
+  drawChip(context, 228 + titleWidth, 194, `${levelInfo.code} ${levelInfo.name}`, theme, true);
+
+  const visibleBadges = snapshot.badges.slice(0, 3);
+  const totalBadgeWidth = visibleBadges.reduce((sum, badge) => {
+    context.font = `15px "${getBodyFont("bold")}"`;
+    return sum + Math.max(110, context.measureText(badge.label).width + 28);
+  }, 0) + (Math.max(0, visibleBadges.length - 1) * 10);
+  let badgeX = 1108 - totalBadgeWidth;
+
+  visibleBadges.forEach((badge, index) => {
+    const width = drawChip(context, badgeX, 82, badge.label, theme);
+    badgeX += width + (index < visibleBadges.length - 1 ? 10 : 0);
+  });
+}
+
+function drawMetricCard(context, x, y, width, height, label, value, caption, theme) {
+  drawPanel(context, x, y, width, height, theme);
+  context.fillStyle = theme.palette.textMuted;
+  context.font = `14px "${getBodyFont("bold")}"`;
+  context.fillText(label.toUpperCase(), x + 22, y + 28);
+
+  context.fillStyle = theme.palette.textPrimary;
+  context.font = `30px "${getDisplayFont()}"`;
+  context.fillText(fitText(context, value, width - 44), x + 22, y + 68);
+
+  context.fillStyle = theme.palette.textSecondary;
+  context.font = `15px "${getBodyFont()}"`;
+  context.fillText(fitText(context, caption, width - 44), x + 22, y + height - 18);
+}
+
+function drawStatsRow(context, snapshot) {
+  const { metrics, levelInfo, theme } = snapshot;
+  const y = 262;
+  const width = 316;
+  const height = 112;
+  const gap = 18;
+
+  drawMetricCard(
+    context,
+    72,
+    y,
+    width,
+    height,
+    "Level Tier",
+    `${levelInfo.name}`,
+    `Tier ${levelInfo.code} | Level ${levelInfo.level}`,
+    theme
   );
 
-  context.fillStyle = theme.palette.accentSoft;
-  drawRoundedRect(context, chipX, chipY, 180, 42, 18);
-  context.fill();
-  context.strokeStyle = theme.palette.line;
-  drawRoundedRect(context, chipX, chipY, 180, 42, 18);
-  context.stroke();
+  drawMetricCard(
+    context,
+    72 + width + gap,
+    y,
+    width,
+    height,
+    "Chat",
+    `${metrics.totalMessages.toLocaleString("id-ID")}`,
+    metrics.chatRank ? `Rank chat #${metrics.chatRank}` : "Belum masuk rank chat",
+    theme
+  );
+
+  drawMetricCard(
+    context,
+    72 + ((width + gap) * 2),
+    y,
+    width,
+    height,
+    "Voice",
+    formatDurationShort(metrics.voiceTotalMs),
+    metrics.voiceRank ? `Rank voice #${metrics.voiceRank}` : "Belum masuk rank voice",
+    theme
+  );
+}
+
+function drawListPanel(context, x, y, width, height, title, entries, emptyLabel, theme, formatter) {
+  drawPanel(context, x, y, width, height, theme);
   context.fillStyle = theme.palette.textPrimary;
-  context.font = `bold 17px "${getFontFamily("bold")}"`;
-  context.textAlign = "center";
-  context.textBaseline = "middle";
-  context.fillText(`${levelInfo.code} ${levelInfo.name}`, chipX + 90, chipY + 23);
-  context.textAlign = "start";
-  context.textBaseline = "alphabetic";
+  context.font = `24px "${getDisplayFont()}"`;
+  context.fillText(title, x + 22, y + 36);
 
-  context.strokeStyle = theme.palette.line;
-  context.lineWidth = 1;
-  context.beginPath();
-  context.moveTo(226, 242);
-  context.lineTo(1080, 242);
-  context.stroke();
-}
-
-function drawBadgeRow(context, badges, theme) {
-  context.font = `bold 15px "${getFontFamily("bold")}"`;
-  let currentX = 74;
-  const y = 274;
-
-  for (const badge of badges.slice(0, 5)) {
-    const width = Math.max(112, context.measureText(badge.label).width + 28);
-    const fill = badge.tone === "accent"
-      ? theme.palette.accentSoft
-      : badge.tone === "special"
-        ? "rgba(255,255,255,0.1)"
-        : badge.tone === "warm"
-          ? "rgba(255, 180, 91, 0.16)"
-          : badge.tone === "cool"
-            ? "rgba(115, 240, 199, 0.16)"
-            : "rgba(255, 255, 255, 0.08)";
-
-    context.fillStyle = fill;
-    drawRoundedRect(context, currentX, y, width, 34, 17);
-    context.fill();
-    context.strokeStyle = theme.palette.line;
-    drawRoundedRect(context, currentX, y, width, 34, 17);
-    context.stroke();
-    context.fillStyle = theme.palette.textPrimary;
-    context.fillText(badge.label, currentX + 14, y + 22);
-    currentX += width + 10;
-  }
-}
-
-function drawMetricCard(context, config, theme) {
-  drawPanel(context, config.x, config.y, config.width, config.height, theme);
-  context.fillStyle = theme.palette.textMuted;
-  context.font = `bold 15px "${getFontFamily("bold")}"`;
-  context.fillText(config.label, config.x + 22, config.y + 28);
-  context.fillStyle = theme.palette.textPrimary;
-  context.font = `bold 30px "${getFontFamily("bold")}"`;
-  context.fillText(config.value, config.x + 22, config.y + 72);
-  context.fillStyle = theme.palette.textSecondary;
-  context.font = `15px "${getFontFamily()}"`;
-  context.fillText(config.caption, config.x + 22, config.y + config.height - 20);
-}
-
-function drawMetricsGrid(context, snapshot) {
-  const { metrics, levelInfo, variant, theme } = snapshot;
-  const topY = 332;
-  const cardWidth = 236;
-  const cardHeight = 118;
-  const gap = 16;
-  const cards = [
-    {
-      label: "LEVEL TIER",
-      value: `${levelInfo.level}`,
-      caption: `${levelInfo.code} ${levelInfo.name}`
-    },
-    {
-      label: "CHAT",
-      value: metrics.totalMessages.toLocaleString("id-ID"),
-      caption: metrics.chatRank ? `Rank #${metrics.chatRank} server` : "Belum masuk rank"
-    },
-    {
-      label: "VOICE",
-      value: formatDurationShort(metrics.voiceTotalMs),
-      caption: metrics.voiceRank ? `Rank #${metrics.voiceRank} server` : "Belum masuk rank"
-    }
-  ];
-
-  if (variant !== "basic") {
-    cards.push({
-      label: "DONASI",
-      value: metrics.donationAmount > 0 ? `Rp ${Number(metrics.donationAmount).toLocaleString("id-ID")}` : "Belum ada",
-      caption: metrics.donationRank ? `Rank #${metrics.donationRank} donatur` : "Belum ada kontribusi tercatat"
+  if (!entries.length) {
+    context.fillStyle = theme.palette.textMuted;
+    context.font = `15px "${getBodyFont()}"`;
+    const emptyLines = wrapText(context, emptyLabel, width - 44, 3);
+    emptyLines.forEach((line, index) => {
+      context.fillText(line, x + 22, y + 72 + (index * 18));
     });
-  }
-
-  cards.forEach((card, index) => {
-    drawMetricCard(context, {
-      ...card,
-      x: 74 + (index * (cardWidth + gap)),
-      y: topY,
-      width: cardWidth,
-      height: cardHeight
-    }, theme);
-  });
-}
-
-function drawWrappedTextBlock(context, text, x, y, maxWidth, maxLines, theme) {
-  context.fillStyle = theme.palette.textSecondary;
-  context.font = `16px "${getFontFamily()}"`;
-  const lines = wrapText(context, text, maxWidth).slice(0, maxLines);
-
-  lines.forEach((line, index) => {
-    context.fillText(line, x, y + (index * 22));
-  });
-}
-
-function drawAdvancedPanels(context, snapshot) {
-  const { metrics, variant, theme, member } = snapshot;
-
-  drawPanel(context, 74, 470, 496, 134, theme);
-  context.fillStyle = theme.palette.textMuted;
-  context.font = `bold 15px "${getFontFamily("bold")}"`;
-  context.fillText("ACTIVITY SNAPSHOT", 96, 498);
-  context.fillStyle = theme.palette.textPrimary;
-  context.font = `bold 28px "${getFontFamily("bold")}"`;
-  context.fillText(`${metrics.currentTopStreak} Current Streak Peak`, 96, 540);
-  drawWrappedTextBlock(
-    context,
-    metrics.streakPairs > 0
-      ? `Punya ${metrics.streakPairs} partner streak aktif dengan best streak ${metrics.bestStreak} hari.`
-      : "Belum ada partner streak aktif yang tercatat di sistem bot.",
-    96,
-    568,
-    440,
-    2,
-    theme
-  );
-
-  drawPanel(context, 586, 470, 494, 134, theme);
-  context.fillStyle = theme.palette.textMuted;
-  context.font = `bold 15px "${getFontFamily("bold")}"`;
-  context.fillText("SERVER STATUS", 608, 498);
-  context.fillStyle = theme.palette.textPrimary;
-  context.font = `bold 24px "${getFontFamily("bold")}"`;
-  context.fillText(member.premiumSinceTimestamp ? "Booster privilege aktif" : "Belum booster aktif", 608, 538);
-  drawWrappedTextBlock(
-    context,
-    [
-      `Masuk server: ${metrics.joinedAtLabel}`,
-      metrics.hasCustomRole
-        ? "Sudah punya custom role aktif."
-        : "Belum punya custom role aktif.",
-      metrics.hasDonorGrant
-        ? "Sedang punya akses donatur sementara."
-        : metrics.donationAmount > 0
-          ? "Pernah tercatat di board donasi."
-          : "Belum punya status donatur."
-    ].join(" "),
-    608,
-    566,
-    440,
-    3,
-    theme
-  );
-
-  if (variant !== "premium") {
     return;
   }
 
-  drawPanel(context, 74, 620, 1006, 92, theme);
-  context.fillStyle = theme.palette.textMuted;
-  context.font = `bold 15px "${getFontFamily("bold")}"`;
-  context.fillText("ELITE FOOTING", 96, 648);
-  context.fillStyle = theme.palette.textPrimary;
-  context.font = `bold 22px "${getFontFamily("bold")}"`;
-  context.fillText("Premium profile channel siap jadi pondasi prestige, shop, dan private utility phase berikutnya.", 96, 685);
+  entries.forEach((entry, index) => {
+    const rowY = y + 68 + (index * 23);
+    context.fillStyle = index === 0 ? theme.palette.accent : theme.palette.textSecondary;
+    context.font = `16px "${getBodyFont("bold")}"`;
+    context.fillText(`${index + 1}.`, x + 22, rowY);
+
+    context.fillStyle = theme.palette.textPrimary;
+    context.font = `16px "${getBodyFont()}"`;
+    context.fillText(fitText(context, formatter(entry), width - 74), x + 54, rowY);
+  });
 }
 
-function drawFooter(context, snapshot, height) {
-  const { variant, theme } = snapshot;
+function drawBioPanel(context, snapshot) {
+  const { metrics, theme } = snapshot;
+  const x = 72;
+  const y = 622;
+  const width = 1036;
+  const height = 86;
+
+  drawPanel(context, x, y, width, height, theme, true);
+  context.fillStyle = theme.palette.textPrimary;
+  context.font = `24px "${getDisplayFont()}"`;
+  context.fillText("Bio", x + 22, y + 34);
+
+  context.fillStyle = theme.palette.textSecondary;
+  context.font = `16px "${getBodyFont()}"`;
+  const lines = wrapText(
+    context,
+    metrics.bio || "Belum ada bio. Pakai `sk profile bio <teks>` atau `/profile set-bio` buat isi profilmu.",
+    width - 44,
+    2
+  );
+
+  lines.forEach((line, index) => {
+    context.fillText(line, x + 22, y + 60 + (index * 18));
+  });
+}
+
+function drawFooter(context, snapshot) {
+  const { metrics, theme } = snapshot;
   context.fillStyle = theme.palette.textMuted;
-  context.font = `15px "${getFontFamily()}"`;
-  context.fillText(`Variant: ${variant.toUpperCase()}`, 76, height - 34);
+  context.font = `14px "${getBodyFont()}"`;
+  context.fillText(`Top friend dihitung dari akumulasi voice bareng. Lagu favorit terisi ${metrics.favoriteSongs.length}/${metrics.favoriteSongLimit}.`, 72, 734);
   context.textAlign = "right";
-  context.fillText("Sokaze Profile Card", 1080, height - 34);
+  context.fillText("Sokaze Profile Card", 1108, 734);
   context.textAlign = "start";
 }
 
 async function createProfileCard(snapshot) {
-  const width = 1150;
-  const height = snapshot.variant === "premium" ? 780 : 720;
+  const width = 1180;
+  const height = 760;
   const canvas = new Canvas(width, height);
   const context = canvas.getContext("2d");
   const avatar = await loadAvatarImage(snapshot.member).catch(() => null);
+  const backgroundImage = await loadThemeBackground(snapshot.theme);
 
-  drawBackground(context, width, height, snapshot.theme);
+  drawBackground(context, width, height, snapshot.theme, backgroundImage);
   drawShell(context, width, height, snapshot.theme);
   drawAvatar(context, avatar, snapshot.member, snapshot.theme);
   drawHeader(context, snapshot);
-  drawBadgeRow(context, snapshot.badges, snapshot.theme);
-  drawMetricsGrid(context, snapshot);
-  drawAdvancedPanels(context, snapshot);
-  drawFooter(context, snapshot, height);
+  drawStatsRow(context, snapshot);
+
+  drawListPanel(
+    context,
+    72,
+    398,
+    330,
+    198,
+    "Top Friends",
+    snapshot.metrics.topFriends,
+    "Belum ada cukup data voice bareng untuk ditampilkan.",
+    snapshot.theme,
+    (entry) => `${entry.displayName} | ${formatDurationShort(entry.totalMs)}`
+  );
+
+  drawListPanel(
+    context,
+    425,
+    398,
+    330,
+    198,
+    "Streak Partners",
+    snapshot.metrics.streakPartners || [],
+    "Belum ada pasangan streak aktif yang tercatat.",
+    snapshot.theme,
+    (entry) => `${entry.displayName} | ${entry.currentStreak}d (${entry.bestStreak})`
+  );
+
+  drawListPanel(
+    context,
+    778,
+    398,
+    330,
+    198,
+    "Favorite Songs",
+    snapshot.metrics.favoriteSongs,
+    "Belum ada lagu favorit. Pakai `sk profile song add` untuk isi.",
+    snapshot.theme,
+    (entry) => entry
+  );
+
+  drawBioPanel(context, snapshot);
+  drawFooter(context, snapshot);
 
   return new AttachmentBuilder(await canvas.encode("png"), {
     name: "sokaze-profile-card.png"

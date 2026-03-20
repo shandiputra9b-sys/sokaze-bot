@@ -1,4 +1,14 @@
-const { ensureProfileAccess, buildProfileCatalogEmbed, buildProfileSnapshot, updateProfileTheme, updateProfileTitle } = require("./profileSystem");
+const {
+  ensureProfileAccess,
+  buildProfileCatalogEmbed,
+  buildProfileSnapshot,
+  updateProfileTheme,
+  updateProfileTitle,
+  updateProfileBio,
+  addProfileFavoriteSong,
+  removeProfileFavoriteSong,
+  clearProfileFavoriteSongs
+} = require("./profileSystem");
 const { createProfileCard } = require("./profileCard");
 const { resolveGuildMember } = require("../../utils/memberResolver");
 
@@ -7,10 +17,10 @@ module.exports = {
   aliases: ["pf", "profil"],
   category: "levels",
   description: "Lihat dan atur profile card Sokaze.",
-  usage: "profile [@member] | profile catalog | profile theme <key> | profile title <key>",
+  usage: "profile [@member] | profile catalog | profile theme <key> | profile title <key> | profile bio <teks> | profile song <add|remove|clear>",
   async execute(message, args) {
     const firstArg = (args[0] || "").toLowerCase();
-    const action = ["catalog", "theme", "title", "view"].includes(firstArg) ? firstArg : "view";
+    const action = ["catalog", "theme", "title", "bio", "song", "view"].includes(firstArg) ? firstArg : "view";
     const access = ensureProfileAccess(message.guild.id, message.author.id, message.member);
 
     if (!access.ok) {
@@ -51,6 +61,53 @@ module.exports = {
       const snapshot = await buildProfileSnapshot(message.guild, message.member);
       const result = updateProfileTitle(message.guild.id, message.author.id, snapshot.levelInfo.level, titleKey);
       await message.reply(result.ok ? `Title profile kamu diganti ke **${result.title.label}**.` : result.reason);
+      return;
+    }
+
+    if (action === "bio") {
+      const bio = args.slice(1).join(" ").trim();
+      const result = updateProfileBio(message.guild.id, message.author.id, bio);
+
+      await message.reply(result.bio
+        ? `Bio profile kamu diupdate ke:\n> ${result.bio}`
+        : "Bio profile kamu berhasil dikosongkan.");
+      return;
+    }
+
+    if (action === "song") {
+      const mode = String(args[1] || "").trim().toLowerCase();
+      const snapshot = await buildProfileSnapshot(message.guild, message.member);
+
+      if (mode === "add") {
+        const song = args.slice(2).join(" ").trim();
+        const result = addProfileFavoriteSong(message.guild.id, message.author.id, snapshot.levelInfo.level, song);
+        await message.reply(result.ok
+          ? `Lagu favorit ditambahkan. Slot terpakai: ${result.songs.length}/${snapshot.metrics.favoriteSongLimit}.`
+          : result.reason);
+        return;
+      }
+
+      if (mode === "remove") {
+        const target = args.slice(2).join(" ").trim();
+        const result = removeProfileFavoriteSong(message.guild.id, message.author.id, snapshot.levelInfo.level, target);
+        await message.reply(result.ok
+          ? `Lagu favorit dihapus. Sisa slot terpakai: ${result.songs.length}/${snapshot.metrics.favoriteSongLimit}.`
+          : result.reason);
+        return;
+      }
+
+      if (mode === "clear") {
+        clearProfileFavoriteSongs(message.guild.id, message.author.id);
+        await message.reply("Semua lagu favorit di profile kamu berhasil dikosongkan.");
+        return;
+      }
+
+      await message.reply([
+        "Gunakan salah satu ini:",
+        "`sk profile song add <judul lagu>`",
+        "`sk profile song remove <nomor|judul lagu>`",
+        "`sk profile song clear`"
+      ].join("\n"));
       return;
     }
 

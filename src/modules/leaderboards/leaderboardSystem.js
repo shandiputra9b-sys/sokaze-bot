@@ -5,11 +5,14 @@ const {
   incrementDonatorAmount,
   listChatEntries,
   listDonators,
+  listVoicePairSessions,
   listVoiceSessions,
   listVoiceTotals,
   removeDonator,
   setDonatorAmount,
+  startVoicePairSession,
   startVoiceSession,
+  stopVoicePairSession,
   stopVoiceSession,
   touchVoiceSession
 } = require("../../services/leaderboardStore");
@@ -600,6 +603,70 @@ async function reconcileVoiceSessionsForGuild(guild) {
   }
 }
 
+function getChannelActiveMemberIds(channel, excludedUserId = "") {
+  if (!channel?.members) {
+    return [];
+  }
+
+  return [...channel.members.values()]
+    .filter((member) => !member.user.bot && member.id !== excludedUserId)
+    .map((member) => member.id);
+}
+
+function startVoicePairSessionsForMember(guild, userId, channelId) {
+  if (!channelId) {
+    return;
+  }
+
+  const channel = guild.channels.cache.get(channelId);
+
+  for (const otherUserId of getChannelActiveMemberIds(channel, userId)) {
+    startVoicePairSession(guild.id, userId, otherUserId, channelId);
+  }
+}
+
+function stopVoicePairSessionsForMember(guild, userId, channelId) {
+  if (!channelId) {
+    return;
+  }
+
+  const channel = guild.channels.cache.get(channelId);
+
+  for (const otherUserId of getChannelActiveMemberIds(channel, userId)) {
+    stopVoicePairSession(guild.id, userId, otherUserId);
+  }
+}
+
+function reconcileVoicePairSessionsForGuild(guild) {
+  const sessions = listVoicePairSessions(guild.id);
+
+  for (const session of sessions) {
+    const [leftUserId, rightUserId] = Array.isArray(session.userIds) ? session.userIds : [];
+    const leftState = guild.voiceStates.cache.get(leftUserId);
+    const rightState = guild.voiceStates.cache.get(rightUserId);
+
+    if (!leftState?.channelId || !rightState?.channelId || leftState.channelId !== rightState.channelId) {
+      stopVoicePairSession(guild.id, leftUserId, rightUserId);
+    }
+  }
+
+  const activeByChannel = new Map();
+
+  for (const state of [...guild.voiceStates.cache.values()].filter((entry) => entry.channelId && !entry.member?.user?.bot)) {
+    const list = activeByChannel.get(state.channelId) || [];
+    list.push(state.id);
+    activeByChannel.set(state.channelId, list);
+  }
+
+  for (const [channelId, userIds] of activeByChannel.entries()) {
+    for (let index = 0; index < userIds.length; index += 1) {
+      for (let innerIndex = index + 1; innerIndex < userIds.length; innerIndex += 1) {
+        startVoicePairSession(guild.id, userIds[index], userIds[innerIndex], channelId);
+      }
+    }
+  }
+}
+
 async function bootstrapVoiceSessions(client) {
   const guilds = [...client.guilds.cache.values()];
 
@@ -607,6 +674,7 @@ async function bootstrapVoiceSessions(client) {
     try {
       await guild.members.fetch().catch(() => null);
       await reconcileVoiceSessionsForGuild(guild);
+      reconcileVoicePairSessionsForGuild(guild);
     } catch (error) {
       console.error(`Failed to bootstrap voice sessions for guild ${guild.id}:`, error);
     }
@@ -632,16 +700,20 @@ async function handleVoiceStateTracking(oldState, newState) {
 
   if (!oldChannelId && newChannelId) {
     startVoiceSession(guild.id, userId, newChannelId);
+    startVoicePairSessionsForMember(guild, userId, newChannelId);
     return true;
   }
 
   if (oldChannelId && !newChannelId) {
+    stopVoicePairSessionsForMember(guild, userId, oldChannelId);
     stopVoiceSession(guild.id, userId);
     return true;
   }
 
   if (oldChannelId && newChannelId && oldChannelId !== newChannelId) {
+    stopVoicePairSessionsForMember(guild, userId, oldChannelId);
     touchVoiceSession(guild.id, userId, newChannelId);
+    startVoicePairSessionsForMember(guild, userId, newChannelId);
     return true;
   }
 
