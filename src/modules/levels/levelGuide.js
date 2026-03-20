@@ -1,11 +1,13 @@
 const { AttachmentBuilder, EmbedBuilder } = require("discord.js");
+const fs = require("node:fs/promises");
 const path = require("node:path");
 
 const INFOGRAPHIC_NAME = "infographic.png";
 const INFOGRAPHIC_PATH = path.join(__dirname, "..", "..", "..", "assets", INFOGRAPHIC_NAME);
 
-function createLevelGuideAttachment() {
-  return new AttachmentBuilder(INFOGRAPHIC_PATH).setName(INFOGRAPHIC_NAME);
+async function createLevelGuideAttachment() {
+  const infographic = await fs.readFile(INFOGRAPHIC_PATH);
+  return new AttachmentBuilder(infographic, { name: INFOGRAPHIC_NAME });
 }
 
 function buildLevelGuideEmbed() {
@@ -23,10 +25,10 @@ function buildLevelGuideEmbed() {
     });
 }
 
-function createLevelGuidePayload() {
+async function createLevelGuidePayload() {
   return {
     embeds: [buildLevelGuideEmbed()],
-    files: [createLevelGuideAttachment()]
+    files: [await createLevelGuideAttachment()]
   };
 }
 

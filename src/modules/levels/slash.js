@@ -224,14 +224,16 @@ module.exports = {
     }
 
     const subcommand = interaction.options.getSubcommand();
+
+    if (subcommand === "guide") {
+      await interaction.deferReply();
+      await interaction.editReply(await createLevelGuidePayload());
+      return;
+    }
+
     const targetUser = interaction.options.getUser("member") || interaction.user;
     const targetMember = interaction.options.getMember("member")
       || await interaction.guild.members.fetch(targetUser.id).catch(() => null);
-
-    if (subcommand === "guide") {
-      await interaction.reply(createLevelGuidePayload());
-      return;
-    }
 
     if (subcommand === "status") {
       const levelInfo = getMemberLevelInfo(interaction.guildId, targetUser.id, interaction.client);

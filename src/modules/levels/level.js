@@ -55,7 +55,7 @@ module.exports = {
     const action = (args[0] || "status").toLowerCase();
 
     if (action === "guide" || action === "info") {
-      await message.reply(createLevelGuidePayload());
+      await message.reply(await createLevelGuidePayload());
       return;
     }
 
