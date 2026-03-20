@@ -18,23 +18,23 @@ const ROLE_PANEL_SELECT_PREFIX = "rolepanel:select:";
 const ROLE_PANEL_OPTION_LIMIT = 25;
 const GAME_ROLE_PANEL_PRESET_KEY = "game-self-role";
 const GAME_ROLE_PANEL_OPTIONS = [
-  { emoji: "<:Bloodstrike:1484573138410012732>", label: "Blood Strike", roleId: "1484571536622092319", description: "Ambil role ini kalau kamu main Blood Strike." },
-  { emoji: "<:Roblox:1484573236829229197>", label: "Roblox", roleId: "1483828827640561735", description: "Ambil role ini kalau kamu main Roblox." },
-  { emoji: "<:GTA5:1484572255295115355>", label: "GTA V", roleId: "1483830806450409674", description: "Ambil role ini kalau kamu main GTA V." },
-  { emoji: "<:WIldRift:1484572328317816894>", label: "League Of Legend", roleId: "1483829133220905001", description: "Ambil role ini kalau kamu main League Of Legend." },
-  { emoji: "<:AmongUs:1484573104402464769>", label: "Among Us", roleId: "1483829507843559554", description: "Ambil role ini kalau kamu main Among Us." },
-  { emoji: "<:FreeFire:1484572125615624295>", label: "Free Fire", roleId: "1483828185064804464", description: "Ambil role ini kalau kamu main Free Fire." },
-  { emoji: "<:mobilelegend:1484571623808962771>", label: "Mobile Legend", roleId: "1483828579111403530", description: "Ambil role ini kalau kamu main Mobile Legend." },
-  { emoji: "<:PUBG:1484575124156973156>", label: "PUBG", roleId: "1483831229483843726", description: "Ambil role ini kalau kamu main PUBG." },
-  { emoji: "<:DotA2:1484575182294094003>", label: "Dota 2", roleId: "1483829808269103224", description: "Ambil role ini kalau kamu main Dota 2." },
-  { emoji: "<:eFootball:1484575057240920284>", label: "Efootball", roleId: "1483830228114739334", description: "Ambil role ini kalau kamu main Efootball." },
-  { emoji: "<:minecraft:1484571584441094194>", label: "Minecraft", roleId: "1483828964068823100", description: "Ambil role ini kalau kamu main Minecraft." },
-  { emoji: "<:genshin:1484575982701514903>", label: "Genshin Impact", roleId: "1483829009195470878", description: "Ambil role ini kalau kamu main Genshin Impact." },
-  { emoji: "<:Growtopia:1484576028004188350>", label: "Growtopia", roleId: "1483830864151314513", description: "Ambil role ini kalau kamu main Growtopia." },
-  { emoji: "<:valorant:1484571699205771314>", label: "Valorant", roleId: "1483828670266212422", description: "Ambil role ini kalau kamu main Valorant." },
-  { emoji: "<:HonorofKings:1484576518981292233>", label: "Honor Of Kings", roleId: "1483831109752979536", description: "Ambil role ini kalau kamu main Honor Of Kings." },
-  { emoji: "<:CODM:1484576573259649165>", label: "Call Of Duty Mobile", roleId: "1484571400009154642", description: "Ambil role ini kalau kamu main Call Of Duty Mobile." },
-  { emoji: "<:WhereWindsMeet:1484576747100831744>", label: "Wheres The Wind Meet", roleId: "1483830903099883571", description: "Ambil role ini kalau kamu main Wheres The Wind Meet." }
+  { emoji: "<:Bloodstrike:1484573138410012732>", label: "Blood Strike", roleId: "1484571536622092319", description: "" },
+  { emoji: "<:Roblox:1484573236829229197>", label: "Roblox", roleId: "1483828827640561735", description: "" },
+  { emoji: "<:GTA5:1484572255295115355>", label: "GTA V", roleId: "1483830806450409674", description: "" },
+  { emoji: "<:WIldRift:1484572328317816894>", label: "League Of Legend", roleId: "1483829133220905001", description: "" },
+  { emoji: "<:AmongUs:1484573104402464769>", label: "Among Us", roleId: "1483829507843559554", description: "" },
+  { emoji: "<:FreeFire:1484572125615624295>", label: "Free Fire", roleId: "1483828185064804464", description: "" },
+  { emoji: "<:mobilelegend:1484571623808962771>", label: "Mobile Legend", roleId: "1483828579111403530", description: "" },
+  { emoji: "<:PUBG:1484575124156973156>", label: "PUBG", roleId: "1483831229483843726", description: "" },
+  { emoji: "<:DotA2:1484575182294094003>", label: "Dota 2", roleId: "1483829808269103224", description: "" },
+  { emoji: "<:eFootball:1484575057240920284>", label: "Efootball", roleId: "1483830228114739334", description: "" },
+  { emoji: "<:minecraft:1484571584441094194>", label: "Minecraft", roleId: "1483828964068823100", description: "" },
+  { emoji: "<:genshin:1484575982701514903>", label: "Genshin Impact", roleId: "1483829009195470878", description: "" },
+  { emoji: "<:Growtopia:1484576028004188350>", label: "Growtopia", roleId: "1483830864151314513", description: "" },
+  { emoji: "<:valorant:1484571699205771314>", label: "Valorant", roleId: "1483828670266212422", description: "" },
+  { emoji: "<:HonorofKings:1484576518981292233>", label: "Honor Of Kings", roleId: "1483831109752979536", description: "" },
+  { emoji: "<:CODM:1484576573259649165>", label: "Call Of Duty Mobile", roleId: "1484571400009154642", description: "" },
+  { emoji: "<:WhereWindsMeet:1484576747100831744>", label: "Wheres The Wind Meet", roleId: "1483830903099883571", description: "" }
 ];
 
 function hasRolePanelPermission(member) {
@@ -557,8 +557,8 @@ async function upsertGameRolePanel(guild, channelId) {
     behavior: "toggle",
     title: "Game Self Role",
     description: [
-      "Pilih role game yang kamu mainkan dari dropdown di bawah.",
-      "Kalau mau lepas role, cukup pilih role yang sama lagi."
+      "Pilih role game kamu dari dropdown di bawah.",
+      "Pilih lagi role yang sama kalau mau melepas."
     ].join("\n"),
     placeholder: "Pilih game kamu di sini",
     presetKey: GAME_ROLE_PANEL_PRESET_KEY,
