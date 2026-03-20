@@ -22,6 +22,7 @@ const SUGGESTION_MODAL_ID = "suggestion:modal";
 const SUGGESTION_VOTE_PREFIX = "suggestion:vote:";
 const SUGGESTION_STATUS_PREFIX = "suggestion:status:";
 const SUGGESTION_UPVOTE_REACTION = "emoji_26:1482708296447037542";
+const SUGGESTION_DOWNVOTE_REACTION = "1360866828376735807";
 
 const DEFAULT_SUGGESTION_SETTINGS = {
   channelId: "",
@@ -273,8 +274,9 @@ function buildSuggestionAnnouncementContent(suggestion) {
   return `Saran baru No ${suggestion.id} dari ${suggestion.authorMention}`;
 }
 
-async function addSuggestionVoteReaction(message) {
+async function addSuggestionVoteReactions(message) {
   await message.react(SUGGESTION_UPVOTE_REACTION).catch(() => null);
+  await message.react(SUGGESTION_DOWNVOTE_REACTION).catch(() => null);
 }
 
 async function createSuggestionDiscussionThread(message, suggestion) {
@@ -611,7 +613,7 @@ async function handleSuggestionModalSubmit(interaction, client) {
   }));
 
   const thread = await createSuggestionDiscussionThread(sent, suggestion);
-  await addSuggestionVoteReaction(sent);
+  await addSuggestionVoteReactions(sent);
 
   if (thread) {
     updateSuggestion(suggestion.id, (current) => ({
