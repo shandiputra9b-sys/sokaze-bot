@@ -8,6 +8,8 @@ const {
 
 const assetsDirectory = path.join(__dirname, "..", "..", "..", "assets");
 const customFontPath = path.join(assetsDirectory, "font.otf");
+const obscuraBackgroundPath = path.join(assetsDirectory, "profile-obscura-bg.png");
+const noctisBackgroundPath = path.join(assetsDirectory, "profile-noctis-bg.png");
 const eclipseBackgroundPath = path.join(assetsDirectory, "profile-eclipse-bg.png");
 
 const regularFontRegistered = GlobalFonts.registerFromPath(customFontPath, "Sokaze Gothic");
@@ -69,8 +71,22 @@ function formatNumber(value) {
   return new Intl.NumberFormat("id-ID").format(Math.max(0, Number(value || 0)));
 }
 
-function isMaxTier(levelInfo) {
-  return Number(levelInfo?.level || 0) >= 5 && Number(levelInfo?.remainingXp || 0) <= 0;
+function getTierVisual(levelInfo) {
+  const level = Number(levelInfo?.level || 0);
+
+  if (level >= 5) {
+    return "eclipse";
+  }
+
+  if (level >= 4) {
+    return "noctis";
+  }
+
+  if (level >= 3) {
+    return "obscura";
+  }
+
+  return "default";
 }
 
 async function loadRemoteImage(url) {
@@ -102,47 +118,147 @@ async function loadLocalImage(filePath) {
 }
 
 function getRenderConfig(levelInfo, config) {
-  if (!isMaxTier(levelInfo)) {
-    return config;
+  const visual = getTierVisual(levelInfo);
+
+  if (visual === "obscura") {
+    return {
+      ...config,
+      background: {
+        ...config.background,
+        baseStart: "#08111a",
+        baseEnd: "#04070b",
+        border: "rgba(119, 231, 216, 0.14)",
+        accentGlow: "rgba(119, 231, 216, 0.1)"
+      },
+      username: {
+        ...config.username,
+        color: "#f6fbff"
+      },
+      xp: {
+        ...config.xp,
+        color: "#d7edf1"
+      },
+      level: {
+        ...config.level,
+        color: "#b8c8d1"
+      },
+      progress: {
+        ...config.progress,
+        background: "rgba(255,255,255,0.08)",
+        fillStart: "#143840",
+        fillEnd: "#77e7d8",
+        border: "rgba(119,231,216,0.16)"
+      },
+      badge: {
+        ...config.badge,
+        enabled: config.badge?.enabled !== false,
+        text: "OBSCURA",
+        fill: "rgba(119,231,216,0.12)",
+        border: "rgba(119,231,216,0.16)",
+        textColor: "#def7f4"
+      }
+    };
   }
 
-  return {
-    ...config,
-    background: {
-      ...config.background,
-      baseStart: "#140d10",
-      baseEnd: "#050405",
-      border: "rgba(216, 179, 106, 0.18)",
-      accentGlow: "rgba(216, 179, 106, 0.12)"
-    },
-    username: {
-      ...config.username,
-      color: "#f7efe2"
-    },
-    xp: {
-      ...config.xp,
-      color: "#ecd8b0"
-    },
-    level: {
-      ...config.level,
-      color: "#d7c4a5"
-    },
-    progress: {
-      ...config.progress,
-      background: "rgba(255,255,255,0.08)",
-      fillStart: "#6a1f29",
-      fillEnd: "#d8b36a",
-      border: "rgba(216,179,106,0.16)"
-    },
-    badge: {
-      ...config.badge,
-      enabled: config.badge?.enabled !== false,
-      text: "ECLIPSE",
-      fill: "rgba(216,179,106,0.14)",
-      border: "rgba(216,179,106,0.2)",
-      textColor: "#f0e2c4"
-    }
-  };
+  if (visual === "noctis") {
+    return {
+      ...config,
+      background: {
+        ...config.background,
+        baseStart: "#0b1016",
+        baseEnd: "#05080d",
+        border: "rgba(143, 183, 255, 0.16)",
+        accentGlow: "rgba(143, 183, 255, 0.12)"
+      },
+      username: {
+        ...config.username,
+        color: "#eff5fd"
+      },
+      xp: {
+        ...config.xp,
+        color: "#dce7f8"
+      },
+      level: {
+        ...config.level,
+        color: "#c1cfde"
+      },
+      progress: {
+        ...config.progress,
+        background: "rgba(255,255,255,0.09)",
+        fillStart: "#22364f",
+        fillEnd: "#8fb7ff",
+        border: "rgba(143,183,255,0.18)"
+      },
+      badge: {
+        ...config.badge,
+        enabled: config.badge?.enabled !== false,
+        text: "NOCTIS",
+        fill: "rgba(143,183,255,0.12)",
+        border: "rgba(143,183,255,0.18)",
+        textColor: "#e0ebff"
+      }
+    };
+  }
+
+  if (visual === "eclipse") {
+    return {
+      ...config,
+      background: {
+        ...config.background,
+        baseStart: "#140d10",
+        baseEnd: "#050405",
+        border: "rgba(216, 179, 106, 0.18)",
+        accentGlow: "rgba(216, 179, 106, 0.12)"
+      },
+      username: {
+        ...config.username,
+        color: "#f7efe2"
+      },
+      xp: {
+        ...config.xp,
+        color: "#ecd8b0"
+      },
+      level: {
+        ...config.level,
+        color: "#d7c4a5"
+      },
+      progress: {
+        ...config.progress,
+        background: "rgba(255,255,255,0.08)",
+        fillStart: "#6a1f29",
+        fillEnd: "#d8b36a",
+        border: "rgba(216,179,106,0.16)"
+      },
+      badge: {
+        ...config.badge,
+        enabled: config.badge?.enabled !== false,
+        text: "ECLIPSE",
+        fill: "rgba(216,179,106,0.14)",
+        border: "rgba(216,179,106,0.2)",
+        textColor: "#f0e2c4"
+      }
+    };
+  }
+
+  return config;
+}
+
+function getTierBackgroundPath(levelInfo) {
+  const visual = getTierVisual(levelInfo);
+
+  if (visual === "obscura") {
+    return obscuraBackgroundPath;
+  }
+
+  if (visual === "noctis") {
+    return noctisBackgroundPath;
+  }
+
+  if (visual === "eclipse") {
+    return eclipseBackgroundPath;
+  }
+
+  return null;
 }
 
 function drawBackground(context, width, height, config, options = {}) {
@@ -157,7 +273,7 @@ function drawBackground(context, width, height, config, options = {}) {
     context.save();
     drawRoundedRect(context, 0, 0, width, height, config.borderRadius);
     context.clip();
-    context.globalAlpha = 0.34;
+    context.globalAlpha = options.backgroundOpacity ?? 0.42;
     context.drawImage(options.backgroundImage, 0, 0, width, height);
     context.restore();
   } else {
@@ -286,9 +402,14 @@ async function createExpCard(member, levelInfo, configOverride = null) {
   const canvas = new Canvas(config.width, config.height);
   const context = canvas.getContext("2d");
   const avatar = await loadAvatarImage(member).catch(() => null);
-  const backgroundImage = isMaxTier(levelInfo) ? await loadLocalImage(eclipseBackgroundPath) : null;
+  const backgroundImagePath = getTierBackgroundPath(levelInfo);
+  const backgroundImage = backgroundImagePath ? await loadLocalImage(backgroundImagePath) : null;
+  const backgroundOpacity = backgroundImage ? 0.48 : undefined;
 
-  drawBackground(context, config.width, config.height, config, { backgroundImage });
+  drawBackground(context, config.width, config.height, config, {
+    backgroundImage,
+    backgroundOpacity
+  });
   drawAvatar(context, avatar, member, config);
   drawTexts(context, member, levelInfo, config);
   drawBadge(context, config);
