@@ -153,56 +153,33 @@ function drawTexts(context, member, levelInfo, config) {
   context.fillStyle = config.xp.color;
   context.font = `${config.xp.size}px "${getFontFamily()}"`;
   context.textAlign = "right";
-  const xpText = `${formatNumber(levelInfo.xp)} ${config.xp.suffix}`;
-  const xpWidth = context.measureText(xpText).width;
-  const xpLeft = config.xp.textX - xpWidth;
-  context.fillText(xpText, config.xp.textX, config.xp.y);
+  context.fillText(`${formatNumber(levelInfo.xp)} ${config.xp.suffix}`, config.xp.textX, config.xp.y);
 
   context.fillStyle = config.level.color;
   context.font = `${config.level.size}px "${getFontFamily()}"`;
   context.textAlign = "start";
   context.fillText(`${config.level.prefix} ${levelInfo.level}`, config.level.x, config.level.y);
-
-  return {
-    xpLeft,
-    xpRight: config.xp.textX
-  };
 }
 
-function drawBadge(context, config, textBounds = null) {
+function drawBadge(context, config) {
   if (!config.badge?.enabled) {
     return;
   }
 
-  const minimumGap = 12;
-  const minimumX = config.avatar.x + config.avatar.size + 16;
-  let badgeX = config.badge.x;
-
-  if (textBounds?.xpLeft) {
-    const badgeRight = badgeX + config.badge.width;
-    const maxRight = textBounds.xpLeft - minimumGap;
-
-    if (badgeRight > maxRight) {
-      badgeX = Math.max(minimumX, maxRight - config.badge.width);
-    }
-  }
-
-  const badgeTextCenterX = badgeX + (config.badge.width / 2);
-
   context.fillStyle = config.badge.fill;
-  drawRoundedRect(context, badgeX, config.badge.y, config.badge.width, config.badge.height, config.badge.radius);
+  drawRoundedRect(context, config.badge.x, config.badge.y, config.badge.width, config.badge.height, config.badge.radius);
   context.fill();
 
   context.strokeStyle = config.badge.border;
   context.lineWidth = 1;
-  drawRoundedRect(context, badgeX, config.badge.y, config.badge.width, config.badge.height, config.badge.radius);
+  drawRoundedRect(context, config.badge.x, config.badge.y, config.badge.width, config.badge.height, config.badge.radius);
   context.stroke();
 
   context.fillStyle = config.badge.textColor;
   context.font = `bold ${config.badge.textSize}px "${getFontFamily("bold")}"`;
   context.textAlign = "center";
   context.textBaseline = "middle";
-  context.fillText(config.badge.text, badgeTextCenterX, config.badge.textCenterY);
+  context.fillText(config.badge.text, config.badge.textCenterX, config.badge.textCenterY);
   context.textAlign = "start";
   context.textBaseline = "alphabetic";
 }
@@ -245,8 +222,8 @@ async function createExpCard(member, levelInfo, configOverride = null) {
 
   drawBackground(context, config.width, config.height, config);
   drawAvatar(context, avatar, member, config);
-  const textBounds = drawTexts(context, member, levelInfo, config);
-  drawBadge(context, config, textBounds);
+  drawTexts(context, member, levelInfo, config);
+  drawBadge(context, config);
   drawProgress(context, levelInfo, config);
 
   return new AttachmentBuilder(await canvas.encode("png"), {
