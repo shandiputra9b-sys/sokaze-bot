@@ -40,6 +40,10 @@ function loadSlashCommands(client) {
       continue;
     }
 
+    if (command.adminOnly || command.botOwnerOnly) {
+      delete data.default_member_permissions;
+    }
+
     client.slashCommands.set(data.name, {
       ...command,
       data

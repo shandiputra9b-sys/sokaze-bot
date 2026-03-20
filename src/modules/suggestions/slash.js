@@ -58,6 +58,7 @@ const slashData = new SlashCommandBuilder()
   );
 
 module.exports = {
+  adminOnly: true,
   slashData,
   async executeSlash(interaction) {
     if (!interaction.inGuild()) {

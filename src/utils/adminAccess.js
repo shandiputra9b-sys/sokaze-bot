@@ -1,0 +1,161 @@
+const {
+  PermissionFlagsBits,
+  PermissionsBitField
+} = require("discord.js");
+const {
+  addAdminUser,
+  clearAdminUsers,
+  getAdminAccessSettings,
+  removeAdminUser
+} = require("../services/adminAccessStore");
+
+const ELEVATED_ADMIN_PERMISSIONS = new PermissionsBitField([
+  PermissionFlagsBits.Administrator,
+  PermissionFlagsBits.ManageGuild,
+  PermissionFlagsBits.ManageChannels,
+  PermissionFlagsBits.ManageRoles,
+  PermissionFlagsBits.ManageMessages,
+  PermissionFlagsBits.ManageNicknames,
+  PermissionFlagsBits.ModerateMembers,
+  PermissionFlagsBits.KickMembers,
+  PermissionFlagsBits.BanMembers
+]);
+
+async function resolveBotOwnerId(client) {
+  const configured = String(client?.config?.botOwnerId || "").trim();
+
+  if (configured) {
+    return configured;
+  }
+
+  try {
+    const application = client.application?.owner
+      ? client.application
+      : await client.application?.fetch();
+    const owner = application?.owner;
+
+    if (!owner) {
+      return "";
+    }
+
+    if (owner.id) {
+      return owner.id;
+    }
+
+    if (owner.ownerId) {
+      return owner.ownerId;
+    }
+
+    const firstTeamMember = owner.members?.first?.() || null;
+    return firstTeamMember?.id || "";
+  } catch {
+    return "";
+  }
+}
+
+async function isBotOwner(userId, client) {
+  if (!userId || !client) {
+    return false;
+  }
+
+  return String(userId) === await resolveBotOwnerId(client);
+}
+
+function isConfiguredGuildAdmin(guildId, userId) {
+  if (!guildId || !userId) {
+    return false;
+  }
+
+  return getAdminAccessSettings(guildId).adminUserIds.includes(String(userId));
+}
+
+async function hasConfiguredAdminAccess(member, client) {
+  if (!member?.guild?.id || !member?.id) {
+    return false;
+  }
+
+  if (await isBotOwner(member.id, client)) {
+    return true;
+  }
+
+  return isConfiguredGuildAdmin(member.guild.id, member.id);
+}
+
+async function buildAdminAccessState(member, client) {
+  const botOwner = await isBotOwner(member?.id, client);
+  const configuredAdmin = Boolean(member?.guild?.id && member?.id && isConfiguredGuildAdmin(member.guild.id, member.id));
+
+  return {
+    botOwner,
+    configuredAdmin,
+    hasAccess: botOwner || configuredAdmin
+  };
+}
+
+function isProtectedPrefixedCommand(command) {
+  return Boolean(command?.botOwnerOnly || command?.adminOnly || command?.category === "admin");
+}
+
+function isProtectedSlashCommand(command) {
+  return Boolean(command?.botOwnerOnly || command?.adminOnly || command?.data?.default_member_permissions);
+}
+
+async function withScopedAdminAccess(member, client, executor) {
+  if (!member?.permissions || typeof member.permissions.has !== "function") {
+    return executor();
+  }
+
+  const access = await buildAdminAccessState(member, client);
+
+  if (!access.hasAccess) {
+    return executor();
+  }
+
+  const originalHas = member.permissions.has.bind(member.permissions);
+  member.permissions.has = (permission, checkAdmin = true) => {
+    if (originalHas(permission, checkAdmin)) {
+      return true;
+    }
+
+    try {
+      const resolved = PermissionsBitField.resolve(permission);
+      return (resolved & ELEVATED_ADMIN_PERMISSIONS.bitfield) !== 0n;
+    } catch {
+      return false;
+    }
+  };
+
+  try {
+    return await executor();
+  } finally {
+    member.permissions.has = originalHas;
+  }
+}
+
+function buildAdminAccessEmbedLines(settings) {
+  const adminMentions = settings.adminUserIds.length
+    ? settings.adminUserIds.map((userId) => `- <@${userId}>`).join("\n")
+    : "- Belum ada admin yang diset";
+
+  return [
+    `Total admin server: **${settings.adminUserIds.length}**`,
+    "",
+    adminMentions
+  ].join("\n");
+}
+
+module.exports = {
+  addAdminUser,
+  buildAdminAccessEmbedLines,
+  buildAdminAccessState,
+  clearAdminUsers,
+  getAdminAccessSettings,
+  hasConfiguredAdminAccess,
+  isBotOwner,
+  isConfiguredGuildAdmin,
+  isProtectedPrefixedCommand,
+  isProtectedSlashCommand,
+  removeAdminUser,
+  resolveBotOwnerId,
+  withScopedAdminAccess
+};

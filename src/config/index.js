@@ -10,6 +10,7 @@ const embedBuilderPassword = process.env.EMBED_BUILDER_PASSWORD || "";
 const config = {
   token: process.env.DISCORD_TOKEN,
   prefix: process.env.PREFIX || "sk",
+  botOwnerId: process.env.BOT_OWNER_ID || "",
   welcome: {
     channelId: process.env.WELCOME_CHANNEL_ID || "",
     publicChannelId: process.env.PUBLIC_CHAT_CHANNEL_ID || "",

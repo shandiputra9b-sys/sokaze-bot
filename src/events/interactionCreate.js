@@ -62,6 +62,11 @@ const {
   handleCustomRoleButton,
   handleCustomRoleModalSubmit
 } = require("../modules/custom-roles/customRoleSystem");
+const {
+  buildAdminAccessState,
+  isProtectedSlashCommand,
+  withScopedAdminAccess
+} = require("../utils/adminAccess");
 
 module.exports = {
   name: "interactionCreate",
@@ -82,7 +87,31 @@ module.exports = {
       }
 
       try {
-        await command.executeSlash(interaction, client);
+        if (command.botOwnerOnly) {
+          const access = await buildAdminAccessState(interaction.member, client);
+
+          if (!access.botOwner) {
+            await interaction.reply({
+              content: "Command ini hanya bisa dipakai oleh bot owner.",
+              ephemeral: true
+            }).catch(() => null);
+            return;
+          }
+        } else if (isProtectedSlashCommand(command)) {
+          const access = await buildAdminAccessState(interaction.member, client);
+
+          if (!access.hasAccess) {
+            await interaction.reply({
+              content: "Command admin ini hanya bisa dipakai oleh admin yang sudah diset bot owner.",
+              ephemeral: true
+            }).catch(() => null);
+            return;
+          }
+        }
+
+        await withScopedAdminAccess(interaction.member, client, async () => {
+          await command.executeSlash(interaction, client);
+        });
       } catch (error) {
         console.error(`Failed to execute slash command "${interaction.commandName}":`, error);
 

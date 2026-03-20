@@ -1,4 +1,9 @@
 const { parsePrefixedCommand } = require("../utils/commandContext");
+const {
+  buildAdminAccessState,
+  isProtectedPrefixedCommand,
+  withScopedAdminAccess
+} = require("../utils/adminAccess");
 const { handleAutomodMessage } = require("../modules/automod/automodSystem");
 const { handleCountingMessage } = require("../modules/counting/countingSystem");
 const {
@@ -106,7 +111,25 @@ module.exports = {
     }
 
     try {
-      await command.execute(message, context.args, client);
+      if (command.botOwnerOnly) {
+        const access = await buildAdminAccessState(message.member, client);
+
+        if (!access.botOwner) {
+          await message.reply("Command ini hanya bisa dipakai oleh bot owner.");
+          return;
+        }
+      } else if (isProtectedPrefixedCommand(command)) {
+        const access = await buildAdminAccessState(message.member, client);
+
+        if (!access.hasAccess) {
+          await message.reply("Command admin ini hanya bisa dipakai oleh admin yang sudah diset bot owner.");
+          return;
+        }
+      }
+
+      await withScopedAdminAccess(message.member, client, async () => {
+        await command.execute(message, context.args, client);
+      });
     } catch (error) {
       console.error(`Failed to execute command "${context.commandName}":`, error);
       await message.reply("Terjadi error saat menjalankan command.");
