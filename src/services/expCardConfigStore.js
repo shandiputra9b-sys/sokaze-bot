@@ -54,17 +54,17 @@ const DEFAULT_EXP_CARD_CONFIG = Object.freeze({
   badge: {
     enabled: true,
     text: "SOKAZE",
-    x: 514,
-    y: 10,
-    width: 74,
+    x: 404,
+    y: 12,
+    width: 82,
     height: 24,
     radius: 12,
     fill: "rgba(255,255,255,0.08)",
     border: "rgba(255,255,255,0.08)",
     textColor: "#d6dbe0",
     textSize: 12,
-    textCenterX: 551,
-    textCenterY: 22
+    textCenterX: 445,
+    textCenterY: 24
   }
 });
 
