@@ -21,14 +21,14 @@ const DEFAULT_EXP_CARD_CONFIG = Object.freeze({
     radius: 14
   },
   username: {
-    x: 110,
+    x: 120,
     y: 41,
-    size: 39,
+    size: 36,
     color: "#f4f7fb"
   },
   xp: {
-    textX: 574,
-    y: 41,
+    textX: 301,
+    y: 51,
     size: 23,
     color: "#e8edf2",
     suffix: "XP"
@@ -47,24 +47,24 @@ const DEFAULT_EXP_CARD_CONFIG = Object.freeze({
     height: 18,
     radius: 9,
     background: "rgba(255,255,255,0.07)",
-    fillStart: "#8a939d",
-    fillEnd: "#c5ccd4",
+    fillStart: "#232424",
+    fillEnd: "#75a7e1",
     border: "rgba(255,255,255,0.08)"
   },
   badge: {
-    enabled: false,
+    enabled: true,
     text: "SOKAZE",
-    x: 404,
-    y: 12,
-    width: 82,
+    x: 512,
+    y: 10,
+    width: 74,
     height: 24,
     radius: 12,
     fill: "rgba(255,255,255,0.08)",
     border: "rgba(255,255,255,0.08)",
     textColor: "#d6dbe0",
-    textSize: 12,
-    textCenterX: 445,
-    textCenterY: 24
+    textSize: 14,
+    textCenterX: 551,
+    textCenterY: 22
   }
 });
 
