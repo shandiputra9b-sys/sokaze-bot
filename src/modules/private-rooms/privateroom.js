@@ -2,6 +2,7 @@ const { ChannelType } = require("discord.js");
 const {
   closeOwnedPrivateRoom,
   createPrivateRoom,
+  sendPrivateRoomPanel,
   hasPrivateRoomAdminPermission,
   inviteToPrivateRoom,
   removeFromPrivateRoom,
@@ -65,11 +66,11 @@ module.exports = {
   aliases: ["proom", "elitechannel"],
   category: "levels",
   description: "Kelola temporary private room untuk member elite.",
-  usage: "privateroom <create|status|invite|remove|close|setcategory|adminstatus>",
+  usage: "privateroom <create|status|invite|remove|close|sendpanel|setcategory|adminstatus>",
   async execute(message, args) {
     const action = (args[0] || "status").toLowerCase();
 
-    if (action === "setcategory" || action === "adminstatus") {
+    if (action === "setcategory" || action === "adminstatus" || action === "sendpanel") {
       if (!hasPrivateRoomAdminPermission(message.member)) {
         await message.reply("Kamu butuh permission Manage Server atau Manage Channels untuk mengatur private room.");
         return;
@@ -84,6 +85,12 @@ module.exports = {
         }
 
         await setPrivateRoomCategory(createCommandInteraction(message, [args[1] || args[0]]));
+        return;
+      }
+
+      if (action === "sendpanel") {
+        const targetChannel = message.mentions.channels.first() || message.channel;
+        await sendPrivateRoomPanel(createCommandInteraction(message), targetChannel);
         return;
       }
 
@@ -136,6 +143,6 @@ module.exports = {
       return;
     }
 
-    await message.reply("Gunakan `sk privateroom create`, `status`, `invite @user`, `remove @user`, `close`, `setcategory #category`, atau `adminstatus`.");
+    await message.reply("Gunakan `sk privateroom create`, `status`, `invite @user`, `remove @user`, `close`, `sendpanel [#channel]`, `setcategory #category`, atau `adminstatus`.");
   }
 };

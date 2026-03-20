@@ -6,6 +6,7 @@ const {
 const {
   closeOwnedPrivateRoom,
   createPrivateRoom,
+  sendPrivateRoomPanel,
   hasPrivateRoomAdminPermission,
   inviteToPrivateRoom,
   removeFromPrivateRoom,
@@ -76,6 +77,18 @@ const slashData = new SlashCommandBuilder()
   )
   .addSubcommand((subcommand) =>
     subcommand
+      .setName("send-panel")
+      .setDescription("Kirim panel private room ke channel")
+      .addChannelOption((option) =>
+        option
+          .setName("channel")
+          .setDescription("Channel target panel")
+          .addChannelTypes(ChannelType.GuildText)
+          .setRequired(false)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
       .setName("admin-status")
       .setDescription("Lihat status sistem private room")
   );
@@ -93,7 +106,7 @@ module.exports = {
 
     const subcommand = interaction.options.getSubcommand();
 
-    if (subcommand === "set-category" || subcommand === "admin-status") {
+    if (subcommand === "set-category" || subcommand === "admin-status" || subcommand === "send-panel") {
       if (!hasPrivateRoomAdminPermission(interaction.member)) {
         await interaction.reply({
           content: "Kamu butuh permission Manage Server atau Manage Channels untuk mengatur private room.",
@@ -104,6 +117,11 @@ module.exports = {
 
       if (subcommand === "set-category") {
         await setPrivateRoomCategory(interaction);
+        return;
+      }
+
+      if (subcommand === "send-panel") {
+        await sendPrivateRoomPanel(interaction, interaction.options.getChannel("channel"));
         return;
       }
 

@@ -45,6 +45,9 @@ const {
   handleTempVoiceSelectMenu
 } = require("../modules/temp-voice/tempVoiceSystem");
 const {
+  handlePrivateRoomButton: handlePrivateRoomPanelButton
+} = require("../modules/private-rooms/privateRoomSystem");
+const {
   handleIdCardButton,
   handleIdCardModalSubmit
 } = require("../modules/idcard/idCardSystem");
@@ -144,6 +147,10 @@ module.exports = {
     }
 
     if (interaction.isButton()) {
+      if (await handlePrivateRoomPanelButton(interaction, client)) {
+        return;
+      }
+
       if (await handleCustomRoleButton(interaction, client)) {
         return;
       }

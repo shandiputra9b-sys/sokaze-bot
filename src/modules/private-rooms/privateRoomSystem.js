@@ -1,4 +1,7 @@
 const {
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
   ChannelType,
   EmbedBuilder,
   PermissionFlagsBits
@@ -14,6 +17,8 @@ const {
 const { getMemberLevelInfo } = require("../levels/levelSystem");
 
 const PRIVATE_ROOM_ACCESS_LEVEL = 5;
+const PRIVATE_ROOM_CREATE_BUTTON_ID = "privateroom:create";
+const PRIVATE_ROOM_STATUS_BUTTON_ID = "privateroom:status";
 const DEFAULT_PRIVATE_ROOM_SETTINGS = {
   categoryId: "",
   inviteLimit: 3,
@@ -83,6 +88,40 @@ function buildSuccessEmbed(title, description) {
     .setTitle(title)
     .setDescription(description)
     .setTimestamp();
+}
+
+function buildPrivateRoomPanelEmbed() {
+  return new EmbedBuilder()
+    .setColor("#111214")
+    .setTitle("Eclipse Private Room")
+    .setDescription([
+      "Private Room adalah channel pribadi sementara untuk member **Level 5 - Eclipse**.",
+      "",
+      "Fungsi utama:",
+      "- Bikin ruang pribadi untuk chat / grind tanpa nyampah di channel umum",
+      "- Bisa invite teman tertentu",
+      "- Bisa ditutup sendiri kapan saja",
+      "",
+      "Klik tombol di bawah untuk membuat room atau cek status room kamu."
+    ].join("\n"))
+    .setFooter({
+      text: "Sokaze Elite Private Room"
+    });
+}
+
+function buildPrivateRoomPanelRows() {
+  return [
+    new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId(PRIVATE_ROOM_CREATE_BUTTON_ID)
+        .setLabel("Buat Private Room")
+        .setStyle(ButtonStyle.Secondary),
+      new ButtonBuilder()
+        .setCustomId(PRIVATE_ROOM_STATUS_BUTTON_ID)
+        .setLabel("Cek Status")
+        .setStyle(ButtonStyle.Secondary)
+    )
+  ];
 }
 
 function sanitizeRoomName(input, fallback) {
@@ -561,6 +600,47 @@ async function setPrivateRoomCategory(interaction) {
   });
 }
 
+async function sendPrivateRoomPanel(interaction, targetChannel = null) {
+  const channel = targetChannel || interaction.channel;
+
+  if (!channel?.isTextBased?.()) {
+    await interaction.reply({
+      embeds: [buildErrorEmbed("Channel target panel tidak valid.")],
+      ephemeral: true
+    });
+    return;
+  }
+
+  const sent = await channel.send({
+    embeds: [buildPrivateRoomPanelEmbed()],
+    components: buildPrivateRoomPanelRows()
+  });
+
+  await interaction.reply({
+    embeds: [
+      buildSuccessEmbed(
+        "Private Room Panel Sent",
+        `Panel private room berhasil dikirim ke ${sent.channel}.`
+      )
+    ],
+    ephemeral: true
+  });
+}
+
+async function handlePrivateRoomButton(interaction) {
+  if (interaction.customId === PRIVATE_ROOM_CREATE_BUTTON_ID) {
+    await createPrivateRoom(interaction);
+    return true;
+  }
+
+  if (interaction.customId === PRIVATE_ROOM_STATUS_BUTTON_ID) {
+    await showPrivateRoomStatus(interaction);
+    return true;
+  }
+
+  return false;
+}
+
 async function showPrivateRoomAdminStatus(interaction) {
   const settings = getPrivateRoomSettings(interaction.guildId);
   const activeRooms = listPrivateRooms(interaction.guildId);
@@ -696,14 +776,18 @@ function handleDeletedPrivateRoom(channel) {
 
 module.exports = {
   PRIVATE_ROOM_ACCESS_LEVEL,
+  PRIVATE_ROOM_CREATE_BUTTON_ID,
+  PRIVATE_ROOM_STATUS_BUTTON_ID,
   createPrivateRoom,
   ensurePrivateRoomAccess,
   extendOwnedPrivateRoom,
+  handlePrivateRoomButton,
   handleDeletedPrivateRoom,
   hasPrivateRoomAdminPermission,
   inviteToPrivateRoom,
   isPrivateRoomChannel,
   removeFromPrivateRoom,
+  sendPrivateRoomPanel,
   setPrivateRoomCategory,
   showPrivateRoomAdminStatus,
   showPrivateRoomStatus,
