@@ -410,8 +410,7 @@ function buildRoleModal(customId, existing = null) {
     .setLabel("Nama Role")
     .setStyle(TextInputStyle.Short)
     .setRequired(true)
-    .setMaxLength(32)
-    .setValue(existing?.name || "");
+    .setMaxLength(32);
 
   const primaryColorInput = new TextInputBuilder()
     .setCustomId("primary_color")
@@ -420,8 +419,7 @@ function buildRoleModal(customId, existing = null) {
     .setRequired(true)
     .setMinLength(7)
     .setMaxLength(7)
-    .setPlaceholder("#ff0000")
-    .setValue(existing?.primaryColor || "");
+    .setPlaceholder("#ff0000");
 
   const secondaryColorInput = new TextInputBuilder()
     .setCustomId("secondary_color")
@@ -430,8 +428,19 @@ function buildRoleModal(customId, existing = null) {
     .setRequired(true)
     .setMinLength(7)
     .setMaxLength(7)
-    .setPlaceholder("#00ffcc")
-    .setValue(existing?.secondaryColor || "");
+    .setPlaceholder("#00ffcc");
+
+  if (existing?.name) {
+    roleNameInput.setValue(existing.name);
+  }
+
+  if (existing?.primaryColor) {
+    primaryColorInput.setValue(existing.primaryColor);
+  }
+
+  if (existing?.secondaryColor) {
+    secondaryColorInput.setValue(existing.secondaryColor);
+  }
 
   modal.addComponents(
     new ActionRowBuilder().addComponents(roleNameInput),
