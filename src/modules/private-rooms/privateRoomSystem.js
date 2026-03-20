@@ -141,6 +141,14 @@ function buildRoomChannelName(member, inputName = "") {
   return `elite-${sanitizeRoomName(seed, "elite-room")}`;
 }
 
+function getOptionalStringOption(interaction, optionName) {
+  if (!interaction?.options || typeof interaction.options.getString !== "function") {
+    return null;
+  }
+
+  return interaction.options.getString(optionName);
+}
+
 function buildRoomTopic(ownerId) {
   return `private-room-owner:${ownerId}`;
 }
@@ -260,7 +268,7 @@ async function createPrivateRoom(interaction) {
 
   const settings = getPrivateRoomSettings(interaction.guildId);
   const category = await resolveConfiguredCategory(interaction.guild);
-  const channelName = buildRoomChannelName(interaction.member, interaction.options.getString("name"));
+  const channelName = buildRoomChannelName(interaction.member, getOptionalStringOption(interaction, "name"));
   const now = Date.now();
   const expiresAt = new Date(now + (settings.lifespanHours * 60 * 60 * 1000)).toISOString();
   const lastActivityAt = new Date(now).toISOString();
