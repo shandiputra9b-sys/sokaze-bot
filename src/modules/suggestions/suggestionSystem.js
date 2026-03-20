@@ -276,6 +276,14 @@ function buildSuggestionAnnouncementContent(suggestion) {
 
 async function addSuggestionVoteReactions(message) {
   await message.react(SUGGESTION_UPVOTE_REACTION).catch(() => null);
+  const downvoteEmoji = message.guild?.emojis?.cache?.get(SUGGESTION_DOWNVOTE_REACTION)
+    || await message.guild?.emojis?.fetch?.(SUGGESTION_DOWNVOTE_REACTION).catch(() => null);
+
+  if (downvoteEmoji) {
+    await message.react(downvoteEmoji).catch(() => null);
+    return;
+  }
+
   await message.react(SUGGESTION_DOWNVOTE_REACTION).catch(() => null);
 }
 
