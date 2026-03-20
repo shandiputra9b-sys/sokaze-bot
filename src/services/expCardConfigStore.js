@@ -52,7 +52,7 @@ const DEFAULT_EXP_CARD_CONFIG = Object.freeze({
     border: "rgba(255,255,255,0.08)"
   },
   badge: {
-    enabled: true,
+    enabled: false,
     text: "SOKAZE",
     x: 404,
     y: 12,
