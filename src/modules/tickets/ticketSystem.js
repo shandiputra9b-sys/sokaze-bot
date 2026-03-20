@@ -6,6 +6,7 @@ const {
   EmbedBuilder,
   PermissionFlagsBits
 } = require("discord.js");
+const { getGuildSettings } = require("../../services/guildConfigService");
 const { getEffectiveGuildSettings } = require("../../utils/guildSettings");
 const { getTicketPriorityFlair } = require("../levels/levelSystem");
 
@@ -188,9 +189,17 @@ async function findExistingTicketChannel(guild, userId) {
 async function createTicketChannel(interaction, client, ticketTypeKey) {
   const { tickets } = getEffectiveGuildSettings(interaction.guildId, client);
   const ticketType = getTicketType(ticketTypeKey);
+  const guildSettings = getGuildSettings(interaction.guildId, {
+    customRoles: {
+      ticketCategoryId: ""
+    }
+  });
+  const customRoleCategoryId = guildSettings.customRoles?.ticketCategoryId || "";
 
   const targetCategoryId = ticketType?.key === "partnership"
     ? tickets.partnershipCategoryId
+    : ticketType?.key === "custom-role" && customRoleCategoryId
+      ? customRoleCategoryId
     : tickets.categoryId;
 
   if (!targetCategoryId) {

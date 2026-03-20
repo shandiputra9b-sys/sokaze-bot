@@ -41,6 +41,7 @@ const DEFAULT_CUSTOM_ROLE_SETTINGS = {
   donorRoleId: "",
   panelChannelId: "",
   panelMessageId: "",
+  ticketCategoryId: "",
   customizeCooldownDays: DEFAULT_CUSTOMIZE_COOLDOWN_DAYS
 };
 
@@ -70,6 +71,20 @@ function updateCustomRoleSettings(guildId, updater) {
       }
     };
   });
+}
+
+async function resolveInteractionMember(interaction) {
+  if (!interaction.inGuild()) {
+    return null;
+  }
+
+  const cached = interaction.guild.members.cache.get(interaction.user.id);
+
+  if (cached) {
+    return cached;
+  }
+
+  return interaction.guild.members.fetch(interaction.user.id).catch(() => null);
 }
 
 function hasCustomRoleAdminPermission(member) {
@@ -319,6 +334,11 @@ function buildCustomRoleStatusEmbed(guild) {
       {
         name: "Panel Klaim",
         value: settings.panelChannelId ? `<#${settings.panelChannelId}>` : "Belum pernah dikirim",
+        inline: false
+      },
+      {
+        name: "Kategori Ticket Custom Role",
+        value: settings.ticketCategoryId ? `<#${settings.ticketCategoryId}>` : "Belum diatur (pakai kategori ticket umum)",
         inline: false
       },
       {
@@ -839,7 +859,17 @@ async function claimCustomRole(interaction, client) {
     return true;
   }
 
-  const entitlement = resolveMemberEntitlement(interaction.guildId, interaction.member);
+  const member = await resolveInteractionMember(interaction);
+
+  if (!member) {
+    await interaction.reply({
+      embeds: [buildErrorEmbed("Data member tidak bisa diambil. Coba lagi sebentar.")],
+      ephemeral: true
+    }).catch(() => null);
+    return true;
+  }
+
+  const entitlement = resolveMemberEntitlement(interaction.guildId, member);
 
   if (!entitlement.eligible) {
     await interaction.reply({
@@ -897,7 +927,17 @@ async function openCustomRoleForm(interaction) {
     return true;
   }
 
-  const entitlement = resolveMemberEntitlement(interaction.guildId, interaction.member);
+  const member = await resolveInteractionMember(interaction);
+
+  if (!member) {
+    await interaction.reply({
+      embeds: [buildErrorEmbed("Data member tidak bisa diambil. Coba lagi sebentar.")],
+      ephemeral: true
+    }).catch(() => null);
+    return true;
+  }
+
+  const entitlement = resolveMemberEntitlement(interaction.guildId, member);
 
   if (!entitlement.eligible) {
     await interaction.reply({
@@ -918,12 +958,23 @@ async function openCustomRoleForm(interaction) {
     return true;
   }
 
-  await interaction.showModal(
-    buildRoleModal(
-      record && role ? CUSTOM_ROLE_MODAL_EDIT_ID : CUSTOM_ROLE_MODAL_CREATE_ID,
-      record && role ? record : null
-    )
-  );
+  try {
+    await interaction.showModal(
+      buildRoleModal(
+        record && role ? CUSTOM_ROLE_MODAL_EDIT_ID : CUSTOM_ROLE_MODAL_CREATE_ID,
+        record && role ? record : null
+      )
+    );
+  } catch (error) {
+    console.error("Failed to open custom role modal:", error);
+
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        embeds: [buildErrorEmbed("Gagal membuka modal custom role. Coba tekan tombol sekali lagi.")],
+        ephemeral: true
+      }).catch(() => null);
+    }
+  }
 
   return true;
 }
@@ -975,7 +1026,17 @@ async function submitCustomRoleModal(interaction, client, mode) {
     return true;
   }
 
-  const entitlement = resolveMemberEntitlement(interaction.guildId, interaction.member);
+  const member = await resolveInteractionMember(interaction);
+
+  if (!member) {
+    await interaction.reply({
+      embeds: [buildErrorEmbed("Data member tidak bisa diambil. Coba lagi sebentar.")],
+      ephemeral: true
+    }).catch(() => null);
+    return true;
+  }
+
+  const entitlement = resolveMemberEntitlement(interaction.guildId, member);
 
   if (!entitlement.eligible) {
     await interaction.reply({
@@ -1037,9 +1098,9 @@ async function submitCustomRoleModal(interaction, client, mode) {
         name: roleName,
         primaryColor,
         secondaryColor
-      }, interaction.member, entitlement);
+      }, member, entitlement);
     } else {
-      managedRole = await createManagedCustomRole(interaction.guild, interaction.member, {
+      managedRole = await createManagedCustomRole(interaction.guild, member, {
         name: roleName,
         primaryColor,
         secondaryColor
@@ -1220,8 +1281,8 @@ module.exports = {
   CUSTOM_ROLE_CLAIM_BUTTON_ID,
   CUSTOM_ROLE_FORM_BUTTON_ID,
   DEFAULT_CUSTOM_ROLE_SETTINGS,
-  grantShopCustomRoleAccess,
   getCustomRoleSettings,
+  grantShopCustomRoleAccess,
   grantTemporaryDonatorRole,
   handleCustomRoleButton,
   handleCustomRoleModalSubmit,
@@ -1235,5 +1296,6 @@ module.exports = {
   sendCustomRolePanel,
   setDonatorRole,
   showCustomRoleStatus,
+  updateCustomRoleSettings,
   startCustomRoleScheduler
 };

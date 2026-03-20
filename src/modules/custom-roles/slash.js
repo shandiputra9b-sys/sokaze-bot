@@ -7,6 +7,7 @@ const {
   hasCustomRoleAdminPermission,
   revokeTemporaryDonatorRole,
   sendCustomRolePanel,
+  updateCustomRoleSettings,
   setDonatorRole,
   showCustomRoleStatus
 } = require("./customRoleSystem");
@@ -36,6 +37,18 @@ const slashData = new SlashCommandBuilder()
         option
           .setName("role")
           .setDescription("Role donatur akses custom role")
+          .setRequired(true)
+      )
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("set-category")
+      .setDescription("Atur kategori khusus untuk ticket custom role")
+      .addChannelOption((option) =>
+        option
+          .setName("category")
+          .setDescription("Kategori target")
+          .addChannelTypes(ChannelType.GuildCategory)
           .setRequired(true)
       )
   )
@@ -84,6 +97,21 @@ module.exports = {
 
     if (subcommand === "set-donatur-role") {
       await setDonatorRole(interaction);
+      return;
+    }
+
+    if (subcommand === "set-category") {
+      const category = interaction.options.getChannel("category", true);
+
+      updateCustomRoleSettings(interaction.guildId, (current) => ({
+        ...current,
+        ticketCategoryId: category.id
+      }));
+
+      await interaction.reply({
+        content: `Kategori ticket custom role berhasil diatur ke ${category}.`,
+        ephemeral: true
+      });
       return;
     }
 
