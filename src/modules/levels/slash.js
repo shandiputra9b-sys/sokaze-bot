@@ -20,6 +20,7 @@ const {
   syncLevelRolesForGuild,
   syncManualLevelForMember
 } = require("./levelSystem");
+const { createLevelGuidePayload } = require("./levelGuide");
 
 function buildSettingsReply(interaction) {
   return {
@@ -32,6 +33,11 @@ const slashData = new SlashCommandBuilder()
   .setName("level")
   .setDescription("Lihat atau atur level member Sokaze")
   .setDMPermission(false)
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName("guide")
+      .setDescription("Lihat panduan tier level dan benefit Sokaze")
+  )
   .addSubcommand((subcommand) =>
     subcommand
       .setName("status")
@@ -221,6 +227,11 @@ module.exports = {
     const targetUser = interaction.options.getUser("member") || interaction.user;
     const targetMember = interaction.options.getMember("member")
       || await interaction.guild.members.fetch(targetUser.id).catch(() => null);
+
+    if (subcommand === "guide") {
+      await interaction.reply(createLevelGuidePayload());
+      return;
+    }
 
     if (subcommand === "status") {
       const levelInfo = getMemberLevelInfo(interaction.guildId, targetUser.id, interaction.client);

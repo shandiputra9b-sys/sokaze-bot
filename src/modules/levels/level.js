@@ -14,6 +14,7 @@ const {
   syncLevelRolesForGuild,
   syncManualLevelForMember
 } = require("./levelSystem");
+const { createLevelGuidePayload } = require("./levelGuide");
 const { resolveGuildMember } = require("../../utils/memberResolver");
 
 function extractRoleId(value) {
@@ -49,9 +50,14 @@ module.exports = {
   aliases: ["tier"],
   category: "levels",
   description: "Lihat dan atur progression level Sokaze.",
-  usage: "level <status|set|role|roles|sync|announce|threshold|reward|cadence|minlength|testup>",
+  usage: "level <guide|status|set|role|roles|sync|announce|threshold|reward|cadence|minlength|testup>",
   async execute(message, args, client) {
     const action = (args[0] || "status").toLowerCase();
+
+    if (action === "guide" || action === "info") {
+      await message.reply(createLevelGuidePayload());
+      return;
+    }
 
     if (action === "status") {
       const targetMember = args[1]
@@ -243,6 +249,7 @@ module.exports = {
 
     await message.reply([
       "Gunakan salah satu ini:",
+      "`sk level guide`",
       "`sk level status [@member]`",
       "`sk level set @member <1-5>`",
       "`sk level role <1-5> <@role|clear>`",
