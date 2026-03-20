@@ -415,6 +415,17 @@ async function handleRolePanelSelect(interaction) {
     return true;
   }
 
+  const targetMember = interaction.guild.members.cache.get(interaction.user.id)
+    || await interaction.guild.members.fetch(interaction.user.id).catch(() => null);
+
+  if (!targetMember) {
+    await interaction.reply({
+      content: "Gagal membaca data member kamu. Coba lagi sebentar.",
+      ephemeral: true
+    });
+    return true;
+  }
+
   const configuredRoleIds = panel.options.map((option) => option.roleId);
   const selectedRoleIds = interaction.values.filter((value) => configuredRoleIds.includes(value));
   const missingRoleIds = configuredRoleIds.filter((roleId) => !interaction.guild.roles.cache.has(roleId));
@@ -448,20 +459,20 @@ async function handleRolePanelSelect(interaction) {
 
   const toggleMode = panel.behavior === "toggle";
   const rolesToRemove = toggleMode
-    ? involvedRoles.filter((role) => selectedRoleIds.includes(role.id) && interaction.member.roles.cache.has(role.id))
+    ? involvedRoles.filter((role) => selectedRoleIds.includes(role.id) && targetMember.roles.cache.has(role.id))
     : involvedRoles.filter((role) =>
-      interaction.member.roles.cache.has(role.id) && !selectedRoleIds.includes(role.id)
+      targetMember.roles.cache.has(role.id) && !selectedRoleIds.includes(role.id)
     );
   const rolesToAdd = toggleMode
-    ? involvedRoles.filter((role) => selectedRoleIds.includes(role.id) && !interaction.member.roles.cache.has(role.id))
+    ? involvedRoles.filter((role) => selectedRoleIds.includes(role.id) && !targetMember.roles.cache.has(role.id))
     : involvedRoles.filter((role) =>
-      selectedRoleIds.includes(role.id) && !interaction.member.roles.cache.has(role.id)
+      selectedRoleIds.includes(role.id) && !targetMember.roles.cache.has(role.id)
     );
   const removedRoles = [];
   const addedRoles = [];
 
   for (const role of rolesToRemove) {
-    const removed = await interaction.member.roles.remove(role).catch(() => null);
+    const removed = await targetMember.roles.remove(role).catch(() => null);
 
     if (removed) {
       removedRoles.push(role);
@@ -469,7 +480,7 @@ async function handleRolePanelSelect(interaction) {
   }
 
   for (const role of rolesToAdd) {
-    const added = await interaction.member.roles.add(role).catch(() => null);
+    const added = await targetMember.roles.add(role).catch(() => null);
 
     if (added) {
       addedRoles.push(role);
