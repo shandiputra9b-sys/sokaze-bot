@@ -6,7 +6,7 @@ module.exports = {
   category: "tickets",
   usage: "tickethelp",
   async execute(message, args, client) {
-    if (!canManageTicketTemplates(message, client)) {
+    if (!await canManageTicketTemplates(message, client)) {
       await message.reply("Kamu tidak punya izin untuk melihat command pelayanan tiket.");
       return;
     }

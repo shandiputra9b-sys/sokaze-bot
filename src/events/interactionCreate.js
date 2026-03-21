@@ -70,6 +70,7 @@ const {
   isProtectedSlashCommand,
   withScopedAdminAccess
 } = require("../utils/adminAccess");
+const { buildBotPermissionAccessState } = require("../utils/botPermissions");
 
 module.exports = {
   name: "interactionCreate",
@@ -96,6 +97,16 @@ module.exports = {
           if (!access.botOwner) {
             await interaction.reply({
               content: "Command ini hanya bisa dipakai oleh bot owner.",
+              ephemeral: true
+            }).catch(() => null);
+            return;
+          }
+        } else if (command.requiredAccess) {
+          const access = await buildBotPermissionAccessState(interaction.member, command.requiredAccess, client);
+
+          if (!access.hasAccess) {
+            await interaction.reply({
+              content: `Kamu tidak punya akses bot \`${access.accessName}\` untuk memakai command ini.`,
               ephemeral: true
             }).catch(() => null);
             return;

@@ -1,9 +1,14 @@
 const { PermissionFlagsBits } = require("discord.js");
 const { getEffectiveGuildSettings } = require("../../utils/guildSettings");
+const { hasBotPermissionAccess } = require("../../utils/botPermissions");
 
-function canManageTicketTemplates(message, client) {
+async function canManageTicketTemplates(message, client) {
   if (!message.guild || !message.member) {
     return false;
+  }
+
+  if (await hasBotPermissionAccess(message.member, "ticket", client)) {
+    return true;
   }
 
   if (
@@ -24,7 +29,7 @@ function createTemplateCommand({ name, description, title, introLines, formLines
     category: "tickets",
     usage: name,
     async execute(message, args, client) {
-      if (!canManageTicketTemplates(message, client)) {
+      if (!await canManageTicketTemplates(message, client)) {
         await message.reply("Kamu tidak punya izin untuk mengirim template support.");
         return;
       }

@@ -4,6 +4,7 @@ const {
   isProtectedPrefixedCommand,
   withScopedAdminAccess
 } = require("../utils/adminAccess");
+const { buildBotPermissionAccessState } = require("../utils/botPermissions");
 const { handleAutomodMessage } = require("../modules/automod/automodSystem");
 const { handleCountingMessage } = require("../modules/counting/countingSystem");
 const {
@@ -116,6 +117,13 @@ module.exports = {
 
         if (!access.botOwner) {
           await message.reply("Command ini hanya bisa dipakai oleh bot owner.");
+          return;
+        }
+      } else if (command.requiredAccess) {
+        const access = await buildBotPermissionAccessState(message.member, command.requiredAccess, client);
+
+        if (!access.hasAccess) {
+          await message.reply(`Kamu tidak punya akses bot \`${access.accessName}\` untuk memakai command ini.`);
           return;
         }
       } else if (isProtectedPrefixedCommand(command)) {
