@@ -33,7 +33,10 @@ module.exports = {
       "Untuk tiket partnership server.",
       "",
       `\`${client.config.prefix}partnershiphelp\``,
-      "Untuk bantuan singkat soal syarat dan alur partnership."
+      "Untuk bantuan singkat soal syarat dan alur partnership.",
+      "",
+      `\`${client.config.prefix}thanks\``,
+      "Untuk mengirim ucapan terima kasih dan tombol rating pelayanan staff/admin."
     ];
 
     await message.reply({

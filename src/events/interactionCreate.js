@@ -5,6 +5,10 @@ const {
   TICKET_TYPE_PREFIX
 } = require("../modules/tickets/ticketSystem");
 const {
+  handleTicketFeedbackButton,
+  handleTicketFeedbackModalSubmit
+} = require("../modules/tickets/ticketFeedbackSystem");
+const {
   buildNewConfessionModal,
   buildReplyConfessionModal,
   CONFESSION_NEW_BUTTON_ID,
@@ -158,6 +162,10 @@ module.exports = {
     }
 
     if (interaction.isButton()) {
+      if (await handleTicketFeedbackButton(interaction, client)) {
+        return;
+      }
+
       if (await handlePrivateRoomPanelButton(interaction, client)) {
         return;
       }
@@ -263,6 +271,10 @@ module.exports = {
     }
 
     if (!interaction.isModalSubmit()) {
+      return;
+    }
+
+    if (await handleTicketFeedbackModalSubmit(interaction, client)) {
       return;
     }
 
