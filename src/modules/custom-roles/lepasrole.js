@@ -1,4 +1,6 @@
 const {
+  ChannelType,
+  EmbedBuilder,
   PermissionFlagsBits,
   PermissionsBitField,
   SlashCommandBuilder
@@ -11,6 +13,7 @@ const {
   getBotPermissionSettings,
   hasBotPermissionAccess
 } = require("../../utils/botPermissions");
+const { getEffectiveGuildSettings } = require("../../utils/guildSettings");
 
 const RESTRICTED_ROLE_PERMISSIONS = new PermissionsBitField([
   PermissionFlagsBits.Administrator,
@@ -56,6 +59,41 @@ async function canUseTicketRoleAccess(interaction, client) {
   }
 
   return hasCustomRoleAdminPermission(interaction.member);
+}
+
+async function sendRoleActionLog(interaction, client, action, member, role) {
+  const { tickets } = getEffectiveGuildSettings(interaction.guildId, client);
+  const logChannelId = tickets.logChannelId || "";
+
+  if (!logChannelId) {
+    return;
+  }
+
+  const logChannel = interaction.guild.channels.cache.get(logChannelId)
+    || await interaction.guild.channels.fetch(logChannelId).catch(() => null);
+
+  if (!logChannel || logChannel.type !== ChannelType.GuildText) {
+    return;
+  }
+
+  const actionLabel = action === "remove" ? "Lepas Role" : "Cabut Donatur";
+
+  await logChannel.send({
+    embeds: [
+      new EmbedBuilder()
+        .setColor("#111214")
+        .setTitle(`Log ${actionLabel}`)
+        .setDescription(
+          [
+            `**Staff**: ${interaction.user} (${interaction.user.tag})`,
+            `**Target**: ${member}`,
+            `**Role**: ${role}`,
+            `**Command**: \`/${interaction.commandName} ${interaction.options.getSubcommand()}\``
+          ].join("\n")
+        )
+        .setTimestamp()
+    ]
+  }).catch(() => null);
 }
 
 async function handleGeneralRoleRemoval(interaction, client) {
@@ -109,6 +147,8 @@ async function handleGeneralRoleRemoval(interaction, client) {
     content: `${role} berhasil dilepas dari ${member}.`,
     ephemeral: true
   });
+
+  await sendRoleActionLog(interaction, client, "remove", member, role);
 }
 
 const slashData = new SlashCommandBuilder()
@@ -170,6 +210,10 @@ module.exports = {
       return;
     }
 
-    await revokeTemporaryDonatorRole(interaction);
+    const result = await revokeTemporaryDonatorRole(interaction);
+
+    if (result?.ok) {
+      await sendRoleActionLog(interaction, client, "donatur", result.member, result.role);
+    }
   }
 };

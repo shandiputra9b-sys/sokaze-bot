@@ -844,6 +844,14 @@ async function grantTemporaryDonatorRole(interaction) {
     ],
     ephemeral: true
   });
+
+  return {
+    ok: true,
+    member,
+    role,
+    days,
+    expiresAt
+  };
 }
 
 async function revokeTemporaryDonatorRole(interaction) {
@@ -885,6 +893,12 @@ async function revokeTemporaryDonatorRole(interaction) {
     embeds: [buildSuccessEmbed("Donator Access Revoked", `Akses donatur sementara untuk ${member} berhasil dicabut.`)],
     ephemeral: true
   });
+
+  return {
+    ok: true,
+    member,
+    role
+  };
 }
 
 async function claimCustomRole(interaction, client) {
