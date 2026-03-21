@@ -76,7 +76,7 @@ function buildFeedbackModal(rating) {
     .setStyle(TextInputStyle.Short)
     .setRequired(true)
     .setMaxLength(64)
-    .setPlaceholder("Contoh: Kak Myraaa");
+    .setPlaceholder("Contoh: Kak Aruna");
 
   const feedbackInput = new TextInputBuilder()
     .setCustomId("feedback_text")
