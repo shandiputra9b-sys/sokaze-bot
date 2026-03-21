@@ -24,6 +24,7 @@ const {
 const { awardTrackedChatCoins } = require("../modules/shop/shopSystem");
 const { touchPrivateRoomActivity } = require("../modules/private-rooms/privateRoomSystem");
 const { awardTrackedChatXp } = require("../modules/levels/levelSystem");
+const { handleAutoThreadMessage } = require("../modules/autothread/autoThreadSystem");
 
 module.exports = {
   name: "messageCreate",
@@ -97,6 +98,7 @@ module.exports = {
         await awardTrackedChatCoins(message, client);
         await awardTrackedChatXp(message, client);
       }
+      await handleAutoThreadMessage(message, client);
       await handleCountingMessage(message, client);
       await handleStickyMessage(message, client);
       await handleIdCardPanelMessage(message, client);
