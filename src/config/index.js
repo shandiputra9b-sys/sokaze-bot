@@ -23,6 +23,7 @@ const config = {
     partnershipCategoryId: process.env.PARTNERSHIP_TICKET_CATEGORY_ID || "",
     logChannelId: process.env.TICKET_LOG_CHANNEL_ID || "",
     feedbackChannelId: process.env.TICKET_FEEDBACK_CHANNEL_ID || "",
+    pingRoleIdsByType: {},
     supportRoleId: process.env.TICKET_SUPPORT_ROLE_ID || "",
     panelChannelId: process.env.TICKET_PANEL_CHANNEL_ID || "",
     partnershipPanelChannelId: process.env.PARTNERSHIP_TICKET_PANEL_CHANNEL_ID || "",

@@ -24,6 +24,13 @@ const TICKET_TYPES = [
   { key: "partnership", label: "Partnership", emoji: "\uD83E\uDD1D", style: ButtonStyle.Success, panel: "partnership" }
 ];
 
+function getTicketTypeChoices() {
+  return TICKET_TYPES.map((type) => ({
+    name: type.label,
+    value: type.key
+  }));
+}
+
 function getTicketType(customIdOrKey) {
   const key = customIdOrKey.startsWith(TICKET_TYPE_PREFIX)
     ? customIdOrKey.slice(TICKET_TYPE_PREFIX.length)
@@ -180,6 +187,17 @@ function buildTicketOpenedEmbed(user, supportRoleId, ticketType, ticketFlair = "
     );
 }
 
+function getTicketPingRoleIds(guildId, ticketTypeKey, client) {
+  const settings = getEffectiveGuildSettings(guildId, client);
+  const roleIds = settings.tickets?.pingRoleIdsByType?.[ticketTypeKey];
+
+  if (!Array.isArray(roleIds)) {
+    return [];
+  }
+
+  return [...new Set(roleIds.filter(Boolean).map((entry) => String(entry).trim()).filter(Boolean))];
+}
+
 async function findExistingTicketChannel(guild, userId) {
   return guild.channels.cache.find((channel) =>
     channel.type === ChannelType.GuildText && channel.topic?.startsWith(`ticket-owner:${userId}|`)
@@ -272,9 +290,20 @@ async function createTicketChannel(interaction, client, ticketTypeKey, options =
   });
 
   const ticketFlair = getTicketPriorityFlair(interaction.guildId, interaction.user.id);
+  const ticketPingRoleIds = getTicketPingRoleIds(interaction.guildId, ticketType.key, client);
+  const mentionRoleIds = [...new Set([
+    ...(tickets.supportRoleId ? [tickets.supportRoleId] : []),
+    ...ticketPingRoleIds
+  ])];
+  const mentionContent = mentionRoleIds.length
+    ? mentionRoleIds.map((roleId) => `<@&${roleId}>`).join(" ")
+    : undefined;
 
   await ticketChannel.send({
-    content: tickets.supportRoleId ? `<@&${tickets.supportRoleId}>` : undefined,
+    content: mentionContent,
+    allowedMentions: {
+      roles: mentionRoleIds
+    },
     embeds: [buildTicketOpenedEmbed(interaction.user, tickets.supportRoleId, ticketType, ticketFlair)],
     components: [buildTicketCloseRow()]
   });
@@ -326,6 +355,8 @@ module.exports = {
   TICKET_TYPE_PREFIX,
   buildPartnershipTicketPanel,
   buildTicketPanel,
+  getTicketPingRoleIds,
+  getTicketTypeChoices,
   getTicketType,
   createTicketChannel,
   closeTicketChannel

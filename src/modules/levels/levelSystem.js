@@ -691,6 +691,10 @@ async function sendLevelUpNotification(guild, member, previousLevelInfo, nextLev
   }
 
   await destination.send({
+    content: `${member}`,
+    allowedMentions: {
+      users: [member.id]
+    },
     files: [card]
   }).catch(() => null);
 

@@ -1,7 +1,7 @@
 const { getGuildSettings } = require("../services/guildConfigService");
 
 function getEffectiveGuildSettings(guildId, client) {
-  return getGuildSettings(guildId, {
+  const settings = getGuildSettings(guildId, {
     welcome: client.config.welcome,
     tickets: client.config.tickets,
     confessions: client.config.confessions,
@@ -9,6 +9,18 @@ function getEffectiveGuildSettings(guildId, client) {
     streak: client.config.streak,
     nameRequests: client.config.nameRequests
   });
+
+  return {
+    ...settings,
+    tickets: {
+      ...client.config.tickets,
+      ...(settings.tickets || {}),
+      pingRoleIdsByType: {
+        ...(client.config.tickets?.pingRoleIdsByType || {}),
+        ...(settings.tickets?.pingRoleIdsByType || {})
+      }
+    }
+  };
 }
 
 module.exports = {
