@@ -15,6 +15,7 @@ module.exports = createTemplateCommand({
     "3. Hal lain yang perlu diketahui admin, jika ada"
   ],
   closingLines: [
-    "Setelah itu, mohon tunggu admin yang bertugas. Jangan spam chat selama proses verifikasi berjalan."
+    "Jika sudah siap, silakan masuk ke channel <#1483510210239926506> untuk proses verifikasi.",
+    "Setelah itu, mohon tunggu admin yang bertugas dan jangan spam chat selama proses verifikasi berjalan."
   ]
 });

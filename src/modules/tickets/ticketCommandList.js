@@ -25,7 +25,7 @@ function buildTicketCommandList(client, guildId) {
             "",
             `\`${client.config.prefix}verifikasi\``,
             "Dipakai untuk tiket **Verifikasi Girl**.",
-            "Isi template: konfirmasi kesiapan verifikasi dan arahan menunggu admin perempuan.",
+            "Isi template: konfirmasi kesiapan verifikasi, arahan masuk channel verifikasi, dan arahan menunggu admin perempuan.",
             "",
             `\`${client.config.prefix}lapor\``,
             "Dipakai untuk tiket **Laporan** dan keluh kesah member.",
