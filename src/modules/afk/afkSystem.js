@@ -3,7 +3,7 @@ const { deleteAfkEntry, getAfkEntry, setAfkEntry } = require("../../services/afk
 const DEFAULT_AFK_REASON = "AFK dulu bentar.";
 const MAX_AFK_REASON_LENGTH = 160;
 const AFK_NICK_PREFIX = "[ AFK ] ";
-const MAX_NICKNAME_LENGTH = 32;
+const DISCORD_NICKNAME_MAX_LENGTH = 32;
 const TEMP_REPLY_MS = 20 * 1000;
 
 function trimReason(value) {
@@ -56,24 +56,33 @@ function stripAfkPrefix(value) {
 
 function buildAfkNickname(member) {
   const baseName = stripAfkPrefix(member.nickname || member.displayName || member.user?.globalName || member.user?.username || "Member");
-  const availableLength = Math.max(1, MAX_NICKNAME_LENGTH - AFK_NICK_PREFIX.length);
-  return `${AFK_NICK_PREFIX}${baseName.slice(0, availableLength)}`.trim();
+  const nextNickname = `${AFK_NICK_PREFIX}${baseName}`.trim();
+
+  if (nextNickname.length > DISCORD_NICKNAME_MAX_LENGTH) {
+    return null;
+  }
+
+  return nextNickname;
 }
 
 async function applyAfkNickname(member) {
   if (!member?.manageable) {
-    return false;
+    return { applied: false, skipped: true, reason: "not-manageable" };
   }
 
   const nextNickname = buildAfkNickname(member);
 
+  if (!nextNickname) {
+    return { applied: false, skipped: true, reason: "discord-limit" };
+  }
+
   if (member.nickname === nextNickname) {
-    return true;
+    return { applied: true, skipped: false, reason: null };
   }
 
   return member.setNickname(nextNickname, "AFK status enabled")
-    .then(() => true)
-    .catch(() => false);
+    .then(() => ({ applied: true, skipped: false, reason: null }))
+    .catch(() => ({ applied: false, skipped: true, reason: "set-failed" }));
 }
 
 async function restoreNicknameFromAfk(member, originalNickname = null) {
@@ -107,8 +116,11 @@ async function setAfkStatus(member, reason) {
     originalNickname: current?.originalNickname ?? member.nickname ?? null
   });
 
-  await applyAfkNickname(member);
-  return entry;
+  const nicknameResult = await applyAfkNickname(member);
+  return {
+    ...entry,
+    nicknameResult
+  };
 }
 
 function clearAfkStatus(guildId, userId) {

@@ -8,11 +8,14 @@ module.exports = {
   usage: "afk [reason]",
   async execute(message, args) {
     const reason = formatAfkReason(args.join(" "));
-    await setAfkStatus(message.member, reason);
+    const afk = await setAfkStatus(message.member, reason);
+    const nicknameNotice = afk.nicknameResult?.reason === "discord-limit"
+      ? "\nCatatan: nickname tidak diubah karena Discord membatasi nickname server maksimal 32 karakter."
+      : "";
 
     await sendTemporaryReply(
       message,
-      `${message.author}, status AFK kamu sudah aktif.\nAlasan: **${reason}**`
+      `${message.author}, status AFK kamu sudah aktif.\nAlasan: **${reason}**${nicknameNotice}`
     );
   }
 };
