@@ -79,6 +79,11 @@ const config = {
       ? process.env.NAME_REQUEST_PROTECTED_ROLE_IDS.split(",").map((item) => item.trim()).filter(Boolean)
       : [],
     accentColor: process.env.NAME_REQUEST_ACCENT_COLOR || "#111111"
+  },
+  staffRecruitment: {
+    panelChannelId: process.env.STAFF_RECRUITMENT_PANEL_CHANNEL_ID || "",
+    reviewChannelId: process.env.STAFF_RECRUITMENT_REVIEW_CHANNEL_ID || "",
+    accentColor: process.env.STAFF_RECRUITMENT_ACCENT_COLOR || "#111111"
   }
 };
 

@@ -28,6 +28,12 @@ const {
   submitNameRequest
 } = require("../modules/name-requests/nameRequestSystem");
 const {
+  STAFF_RECRUITMENT_BUTTON_ID,
+  STAFF_RECRUITMENT_MODAL_ID,
+  buildStaffRecruitmentModal,
+  submitStaffRecruitment
+} = require("../modules/staff-recruitment/staffRecruitmentSystem");
+const {
   buildQuoteModal,
   publishQuoteFromInteraction,
   QUOTE_CREATE_BUTTON_ID,
@@ -195,6 +201,11 @@ module.exports = {
         return;
       }
 
+      if (interaction.customId === STAFF_RECRUITMENT_BUTTON_ID) {
+        await interaction.showModal(buildStaffRecruitmentModal());
+        return;
+      }
+
       if (interaction.customId.startsWith(NAME_REQUEST_APPROVE_PREFIX)) {
         await interaction.deferReply({ ephemeral: true });
         const requestId = interaction.customId.slice(NAME_REQUEST_APPROVE_PREFIX.length);
@@ -321,6 +332,24 @@ module.exports = {
         content: result.direct
           ? `Nama kamu berhasil diganti langsung lewat benefit level sebagai #${result.id}.`
           : `Request name berhasil dikirim sebagai #${result.id}.`,
+        ephemeral: true
+      });
+      return;
+    }
+
+    if (interaction.customId === STAFF_RECRUITMENT_MODAL_ID) {
+      const result = await submitStaffRecruitment(interaction, client);
+
+      if (!result.ok) {
+        await interaction.reply({
+          content: result.reason,
+          ephemeral: true
+        });
+        return;
+      }
+
+      await interaction.reply({
+        content: "Form recruitment staff berhasil dikirim. Terima kasih sudah mendaftar.",
         ephemeral: true
       });
       return;

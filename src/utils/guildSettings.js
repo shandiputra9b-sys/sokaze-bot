@@ -7,7 +7,8 @@ function getEffectiveGuildSettings(guildId, client) {
     confessions: client.config.confessions,
     counting: client.config.counting,
     streak: client.config.streak,
-    nameRequests: client.config.nameRequests
+    nameRequests: client.config.nameRequests,
+    staffRecruitment: client.config.staffRecruitment
   });
 
   return {
