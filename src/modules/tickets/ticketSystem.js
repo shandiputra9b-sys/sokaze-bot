@@ -15,13 +15,13 @@ const TICKET_TYPE_PREFIX = "ticket:type:";
 
 const TICKET_TYPES = [
   { key: "verifikasi-girl", label: "Verifikasi Girl", emoji: "\uD83D\uDC97", style: ButtonStyle.Secondary, panel: "main" },
-  { key: "minta-role", label: "Minta Role", emoji: "\uD83C\uDFAD", style: ButtonStyle.Primary, panel: "main" },
+  { key: "minta-role", label: "Minta Role", emoji: "\uD83C\uDFAD", style: ButtonStyle.Secondary, panel: "main" },
   { key: "hapus-role", label: "Hapus Role", emoji: "\uD83E\uDDF9", style: ButtonStyle.Secondary, panel: "main" },
-  { key: "laporan", label: "Laporan", emoji: "\uD83D\uDEA8", style: ButtonStyle.Danger, panel: "main" },
-  { key: "pasang-iklan", label: "Pasang Iklan", emoji: "\uD83D\uDCE2", style: ButtonStyle.Success, panel: "main" },
-  { key: "media-partner", label: "Media Partner", emoji: "\uD83D\uDCE1", style: ButtonStyle.Primary, panel: "main" },
-  { key: "custom-role", label: "Custom Role", emoji: "\u2728", style: ButtonStyle.Primary, panel: "custom-role" },
-  { key: "partnership", label: "Partnership", emoji: "\uD83E\uDD1D", style: ButtonStyle.Success, panel: "partnership" }
+  { key: "laporan", label: "Laporan", emoji: "\uD83D\uDEA8", style: ButtonStyle.Secondary, panel: "main" },
+  { key: "pasang-iklan", label: "Pasang Iklan", emoji: "\uD83D\uDCE2", style: ButtonStyle.Secondary, panel: "main" },
+  { key: "media-partner", label: "Media Partner", emoji: "\uD83D\uDCE1", style: ButtonStyle.Secondary, panel: "main" },
+  { key: "custom-role", label: "Custom Role", emoji: "\u2728", style: ButtonStyle.Secondary, panel: "custom-role" },
+  { key: "partnership", label: "Partnership", emoji: "\uD83E\uDD1D", style: ButtonStyle.Secondary, panel: "partnership" }
 ];
 
 function getTicketTypeChoices() {
@@ -55,12 +55,14 @@ function buildTicketPanel(client, guildId) {
     "",
     "**SOP Pengambilan Tiket:**",
     "- \uD83D\uDD58 Jam aktif loket: `09.00 WIB - 02.00 WIB`",
-    "- \uD83D\uDC69 Verifikasi Girl wajib siap ditemani admin perempuan",
-    "- \uD83D\uDEAB Dilarang membuat laporan palsu",
-    "- \uD83D\uDD15 Dilarang tag role yang diinginkan",
-    "- \uD83D\uDCDD Contoh yang dilarang: <@&1482710348380373123>",
-    "- \u23F3 Dilarang spam loket sebelum `2x24 jam`",
-    "- \uD83D\uDDF4 Tiket akan ditutup dalam `6 jam` tanpa balasan",
+    "- \uD83E\uDDFE Pilih kategori tiket sesuai kebutuhanmu",
+    "- \uD83D\uDC69 Verifikasi Girl hanya akan diproses oleh admin perempuan",
+    "- \uD83D\uDEAB Dilarang membuat laporan palsu, manipulatif, atau tidak sesuai fakta",
+    "- \uD83D\uDD15 Dilarang mention atau tag role tanpa izin",
+    "- \u23F3 Dilarang membuka tiket berulang sebelum `2x24 jam`",
+    "- \uD83D\uDDF4 Tiket akan ditutup otomatis setelah `6 jam` tanpa respon",
+    "",
+    "- \u26A0\uFE0F Pelanggaran SOP dapat menyebabkan tiket ditolak atau langsung ditutup",
     "",
     "Klik tombol di bawah untuk membuka tiket."
   ];
