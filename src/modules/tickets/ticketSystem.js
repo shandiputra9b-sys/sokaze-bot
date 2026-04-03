@@ -256,6 +256,12 @@ async function createTicketChannel(interaction, client, ticketTypeKey, options =
     };
   }
 
+  const ticketPingRoleIds = getTicketPingRoleIds(interaction.guildId, ticketType.key, client);
+  const accessRoleIds = [...new Set([
+    ...(tickets.supportRoleId ? [tickets.supportRoleId] : []),
+    ...ticketPingRoleIds
+  ])];
+
   const ticketChannel = await interaction.guild.channels.create({
     name: `ticket-${ticketType.key}-${interaction.user.username}`
       .toLowerCase()
@@ -277,22 +283,19 @@ async function createTicketChannel(interaction, client, ticketTypeKey, options =
           PermissionFlagsBits.ReadMessageHistory
         ]
       },
-      ...(tickets.supportRoleId
-        ? [{
-            id: tickets.supportRoleId,
-            allow: [
-              PermissionFlagsBits.ViewChannel,
-              PermissionFlagsBits.SendMessages,
-              PermissionFlagsBits.ReadMessageHistory,
-              PermissionFlagsBits.ManageMessages
-            ]
-          }]
-        : [])
+      ...accessRoleIds.map((roleId) => ({
+        id: roleId,
+        allow: [
+          PermissionFlagsBits.ViewChannel,
+          PermissionFlagsBits.SendMessages,
+          PermissionFlagsBits.ReadMessageHistory,
+          PermissionFlagsBits.ManageMessages
+        ]
+      }))
     ]
   });
 
   const ticketFlair = getTicketPriorityFlair(interaction.guildId, interaction.user.id);
-  const ticketPingRoleIds = getTicketPingRoleIds(interaction.guildId, ticketType.key, client);
   const mentionRoleIds = [...new Set([
     ...(tickets.supportRoleId ? [tickets.supportRoleId] : []),
     ...ticketPingRoleIds
@@ -318,8 +321,10 @@ async function createTicketChannel(interaction, client, ticketTypeKey, options =
 
 async function closeTicketChannel(interaction, client) {
   const { tickets } = getEffectiveGuildSettings(interaction.guildId, client);
-  const ownerTag = interaction.channel.topic
-    ?.match(/^ticket-owner:(\d+)\|type:/)?.[1];
+  const ownerTag = interaction.channel.topic?.match(/^ticket-owner:(\d+)\|type:/)?.[1];
+  const ticketTypeKey = interaction.channel.topic?.match(/\|type:([^|]+)/)?.[1] || "";
+  const ticketPingRoleIds = ticketTypeKey ? getTicketPingRoleIds(interaction.guildId, ticketTypeKey, client) : [];
+  const hasTicketPingAccess = ticketPingRoleIds.some((roleId) => interaction.member.roles.cache.has(roleId));
 
   if (!ownerTag) {
     return {
@@ -331,6 +336,7 @@ async function closeTicketChannel(interaction, client) {
   if (
     interaction.user.id !== ownerTag &&
     !interaction.member.permissions.has(PermissionFlagsBits.ManageChannels) &&
+    !hasTicketPingAccess &&
     (!tickets.supportRoleId || !interaction.member.roles.cache.has(tickets.supportRoleId))
   ) {
     return {
